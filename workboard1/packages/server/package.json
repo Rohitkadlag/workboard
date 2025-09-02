@@ -1,0 +1,23 @@
+{
+  "name": "@workboard/server",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "NODE_ENV=development bun --hot src/index.js",
+    "start": "NODE_ENV=production bun src/index.js",
+    "seed": "bun src/scripts/seed.js"
+  },
+  "dependencies": {
+    "@workboard/shared": "workspace:*",
+    "express": "^4.18.2",
+    "mongoose": "^8.1.0",
+    "socket.io": "^4.7.4",
+    "cors": "^2.8.5",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "pino": "^8.17.2",
+    "pino-pretty": "^10.3.1",
+    "dotenv": "^16.3.1"
+  }
+}

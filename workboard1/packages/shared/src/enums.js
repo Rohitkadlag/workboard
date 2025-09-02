@@ -1,0 +1,6 @@
+export const ROLES = { ADMIN: 'ADMIN', MANAGER: 'MANAGER', EMPLOYEE: 'EMPLOYEE' };
+export const TASK_STATUS = { BACKLOG: 'BACKLOG', TODO: 'TODO', IN_PROGRESS: 'IN_PROGRESS', REVIEW: 'REVIEW', DONE: 'DONE' };
+export const LEAVE_STATUS = { PENDING: 'PENDING', APPROVED: 'APPROVED', DENIED: 'DENIED' };
+export const ROLES_ARRAY = Object.values(ROLES);
+export const TASK_STATUS_ARRAY = Object.values(TASK_STATUS);
+export const LEAVE_STATUS_ARRAY = Object.values(LEAVE_STATUS);

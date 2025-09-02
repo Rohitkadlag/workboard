@@ -1,0 +1,31 @@
+{
+  "name": "workboard",
+  "version": "1.0.0",
+  "description": "Production-ready MERN monorepo for project management",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/server",
+    "packages/web",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev:server": "bun run --cwd packages/server dev",
+    "dev:web": "bun run --cwd packages/web dev",
+    "build:server": "bun run --cwd packages/server build",
+    "build:web": "bun run --cwd packages/web build",
+    "start:server": "bun run --cwd packages/server start",
+    "lint": "eslint packages/*/src --ext .js,.jsx",
+    "seed": "bun run --cwd packages/server seed"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-react": "^7.34.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "prettier": "^3.2.5"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}
