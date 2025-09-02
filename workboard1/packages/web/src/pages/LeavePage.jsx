@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { leaveAPI } from '../utils/api.js';
 
@@ -10,8 +10,35 @@ const LeavePage = () => {
     reason: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGettingSuggestions, setIsGettingSuggestions] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+
+  useEffect(() => {
+    // Listen for leave decision notifications
+    const handleLeaveDecision = (event) => {
+      const decision = event.detail;
+      // You could show a toast notification here
+      console.log('Leave decision received:', decision);
+      
+      // If we have a current result and it matches, update it
+      if (result && result.leave._id === decision.id) {
+        setResult(prev => ({
+          ...prev,
+          leave: {
+            ...prev.leave,
+            status: decision.status,
+            decisionNote: decision.note,
+            decidedAt: decision.decidedAt
+          }
+        }));
+      }
+    };
+
+    window.addEventListener('leaveDecision', handleLeaveDecision);
+    return () => window.removeEventListener('leaveDecision', handleLeaveDecision);
+  }, [result]);
 
   const handleChange = (e) => {
     setFormData({
@@ -108,10 +135,39 @@ const LeavePage = () => {
     }
   };
 
+  const handleGetSuggestions = async () => {
+    try {
+      setIsGettingSuggestions(true);
+      setError('');
+      
+      const preferences = {};
+      if (formData.startDate) preferences.preferredStart = formData.startDate;
+      if (formData.endDate) preferences.preferredEnd = formData.endDate;
+      
+      const response = await leaveAPI.getSuggestions(preferences);
+      setSuggestions(response.data.suggestions || []);
+      
+    } catch (error) {
+      console.error('AI suggestions error:', error);
+      setError('Failed to get AI suggestions. Please try again.');
+    } finally {
+      setIsGettingSuggestions(false);
+    }
+  };
+
+  const handleUseSuggestion = (suggestion) => {
+    setFormData({
+      ...formData,
+      startDate: suggestion.startDate,
+      endDate: suggestion.endDate
+    });
+    setSuggestions([]); // Clear suggestions after use
+  };
+
   const leaveDays = calculateLeaveDays();
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Leave Request</h1>
@@ -130,10 +186,27 @@ const LeavePage = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Leave request form */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Submit Leave Request</h2>
+        <div className="xl:col-span-2 bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Submit Leave Request</h2>
+            <button
+              type="button"
+              onClick={handleGetSuggestions}
+              disabled={isGettingSuggestions}
+              className="btn btn-outline btn-sm"
+            >
+              {isGettingSuggestions ? (
+                <div className="flex items-center">
+                  <div className="animate-spin -ml-1 mr-2 h-4 w-4 border-2 border-brand-600 border-t-transparent rounded-full"></div>
+                  Getting AI Suggestions...
+                </div>
+              ) : (
+                '🤖 Ask AI for Best Time'
+              )}
+            </button>
+          </div>
           
           {error && (
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
@@ -234,80 +307,142 @@ const LeavePage = () => {
           </form>
         </div>
 
-        {/* AI Decision Result */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">AI Agent Decision</h2>
-          
-          {!result ? (
-            <div className="text-center py-12">
-              <span className="text-6xl mb-4 block">🤖</span>
-              <p className="text-gray-500 mb-2">AI Leave Agent Ready</p>
-              <p className="text-sm text-gray-400">
-                Submit a leave request to see the AI-powered decision analysis
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Decision status */}
-              <div className={`p-4 rounded-lg border-2 ${
-                result.leave.status === 'APPROVED'
-                  ? 'bg-green-50 border-green-200'
-                  : result.leave.status === 'DENIED'
-                  ? 'bg-red-50 border-red-200'
-                  : 'bg-yellow-50 border-yellow-200'
-              }`}>
-                <div className="flex items-center">
-                  <span className="text-2xl mr-3">
-                    {result.leave.status === 'APPROVED' ? '✅' : 
-                     result.leave.status === 'DENIED' ? '❌' : '⏳'}
-                  </span>
-                  <div>
-                    <h3 className={`font-bold text-lg ${
-                      result.leave.status === 'APPROVED' ? 'text-green-800' :
-                      result.leave.status === 'DENIED' ? 'text-red-800' : 'text-yellow-800'
-                    }`}>
-                      Request {result.leave.status}
-                    </h3>
-                    <p className={`text-sm ${
-                      result.leave.status === 'APPROVED' ? 'text-green-700' :
-                      result.leave.status === 'DENIED' ? 'text-red-700' : 'text-yellow-700'
-                    }`}>
-                      {new Date(result.leave.createdAt).toLocaleString()}
-                    </p>
+        {/* AI Suggestions & Decision Result */}
+        <div className="space-y-6">
+          {/* AI Suggestions */}
+          {suggestions.length > 0 && (
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">AI Suggestions</h3>
+              <div className="space-y-3">
+                {suggestions.map((suggestion, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 hover:border-brand-300 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-900">
+                        {new Date(suggestion.startDate).toLocaleDateString()} - {new Date(suggestion.endDate).toLocaleDateString()}
+                      </span>
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        suggestion.coverageScore >= 0.8 
+                          ? 'bg-green-100 text-green-800' 
+                          : suggestion.coverageScore >= 0.6 
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {Math.round(suggestion.coverageScore * 100)}% coverage
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3">{suggestion.reasoning}</p>
+                    {suggestion.conflicts.length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-xs text-orange-600 mb-1">Conflicts:</p>
+                        <ul className="text-xs text-orange-700 space-y-1">
+                          {suggestion.conflicts.map((conflict, idx) => (
+                            <li key={idx}>• {conflict.detail} ({conflict.date})</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => handleUseSuggestion(suggestion)}
+                      className="btn btn-sm btn-outline w-full"
+                    >
+                      Use this window
+                    </button>
                   </div>
-                </div>
-              </div>
-
-              {/* AI Analysis */}
-              <div className="space-y-4">
-                <h4 className="font-semibold text-gray-900">AI Analysis & Rationale</h4>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono overflow-x-auto">
-                    {JSON.stringify(result.agent, null, 2)}
-                  </pre>
-                </div>
-              </div>
-
-              {/* Leave request details */}
-              <div className="border-t pt-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Request Details</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">Start Date:</span>
-                    <p className="font-medium">{new Date(result.leave.startDate).toLocaleDateString()}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">End Date:</span>
-                    <p className="font-medium">{new Date(result.leave.endDate).toLocaleDateString()}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-gray-600">Reason:</span>
-                    <p className="font-medium mt-1">{result.leave.reason}</p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           )}
+
+          {/* AI Decision Result */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">AI Agent Decision</h2>
+            
+            {!result ? (
+              <div className="text-center py-12">
+                <span className="text-6xl mb-4 block">🤖</span>
+                <p className="text-gray-500 mb-2">AI Leave Agent Ready</p>
+                <p className="text-sm text-gray-400">
+                  Submit a leave request to see the AI-powered decision analysis
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Decision status */}
+                <div className={`p-4 rounded-lg border-2 ${
+                  result.leave.status === 'APPROVED'
+                    ? 'bg-green-50 border-green-200'
+                    : result.leave.status === 'DENIED'
+                    ? 'bg-red-50 border-red-200'
+                    : 'bg-yellow-50 border-yellow-200'
+                }`}>
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-3">
+                      {result.leave.status === 'APPROVED' ? '✅' : 
+                       result.leave.status === 'DENIED' ? '❌' : '⏳'}
+                    </span>
+                    <div>
+                      <h3 className={`font-bold text-lg ${
+                        result.leave.status === 'APPROVED' ? 'text-green-800' :
+                        result.leave.status === 'DENIED' ? 'text-red-800' : 'text-yellow-800'
+                      }`}>
+                        Request {result.leave.status}
+                      </h3>
+                      <p className={`text-sm ${
+                        result.leave.status === 'APPROVED' ? 'text-green-700' :
+                        result.leave.status === 'DENIED' ? 'text-red-700' : 'text-yellow-700'
+                      }`}>
+                        {new Date(result.leave.createdAt).toLocaleString()}
+                      </p>
+                      {result.leave.decidedAt && (
+                        <p className={`text-sm ${
+                          result.leave.status === 'APPROVED' ? 'text-green-700' :
+                          result.leave.status === 'DENIED' ? 'text-red-700' : 'text-yellow-700'
+                        }`}>
+                          Decided: {new Date(result.leave.decidedAt).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {result.leave.decisionNote && (
+                    <div className="mt-3 p-2 bg-white bg-opacity-50 rounded">
+                      <p className="text-sm font-medium">Decision Note:</p>
+                      <p className="text-sm">{result.leave.decisionNote}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* AI Analysis */}
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-gray-900">AI Analysis & Rationale</h4>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono overflow-x-auto">
+                      {JSON.stringify(result.agent, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+
+                {/* Leave request details */}
+                <div className="border-t pt-4">
+                  <h4 className="font-semibold text-gray-900 mb-3">Request Details</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">Start Date:</span>
+                      <p className="font-medium">{new Date(result.leave.startDate).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">End Date:</span>
+                      <p className="font-medium">{new Date(result.leave.endDate).toLocaleDateString()}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-600">Reason:</span>
+                      <p className="font-medium mt-1">{result.leave.reason}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

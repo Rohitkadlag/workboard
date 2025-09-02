@@ -28,6 +28,43 @@ DECISION CRITERIA:
 
 Respond with ONLY valid JSON, no additional text or formatting.`;
 
+const SUGGESTIONS_PROMPT = `You are a Leave Scheduling Assistant. Given team availability, overlapping leaves, task deadlines and policy constraints, recommend optimal leave windows.
+
+INPUT FORMAT:
+- employee: Employee details and preferences
+- teammates: Number of team members
+- overlappingLeaves: Approved/pending leaves of teammates
+- upcomingTasks: Tasks due in the horizon period
+- policy: {maxConsecutiveDays, minNoticeDays, minCoverage, horizonDays}
+
+OUTPUT FORMAT (STRICT JSON ONLY):
+{
+  "suggestions": [
+    {
+      "startDate": "YYYY-MM-DD",
+      "endDate": "YYYY-MM-DD", 
+      "reasoning": "Why this window is optimal",
+      "coverageScore": 0.85,
+      "conflicts": [
+        {
+          "type": "task|leave",
+          "date": "YYYY-MM-DD",
+          "detail": "Brief description"
+        }
+      ]
+    }
+  ]
+}
+
+CRITERIA:
+- Suggest 2-4 optimal windows within horizon
+- Respect maxConsecutiveDays and minNoticeDays policy
+- Ensure minCoverage team availability
+- Minimize conflicts with deadlines and other leaves
+- Consider employee preferences if provided
+
+Respond with ONLY valid JSON, no additional text or formatting.`;
+
 class LeaveAgentService {
   async processLeaveRequest(employee, request, workload = [], policy = {}) {
     try {
@@ -98,6 +135,48 @@ class LeaveAgentService {
     }
   }
 
+  async getSuggestions(context) {
+    try {
+      const messages = [
+        { role: 'system', content: SUGGESTIONS_PROMPT },
+        { role: 'user', content: JSON.stringify(context) }
+      ];
+
+      logger.info('Getting AI leave suggestions');
+      const response = await deepseekService.chat(messages, {
+        temperature: 0.4,
+        max_tokens: 1000
+      });
+
+      let suggestions;
+      try {
+        const parsed = JSON.parse(response);
+        suggestions = parsed.suggestions || [];
+
+        // Validate and clean suggestions
+        suggestions = suggestions.filter(s => 
+          s.startDate && s.endDate && s.reasoning
+        ).map(s => ({
+          startDate: s.startDate,
+          endDate: s.endDate,
+          reasoning: s.reasoning,
+          coverageScore: Math.min(1.0, Math.max(0.0, s.coverageScore || 0.5)),
+          conflicts: Array.isArray(s.conflicts) ? s.conflicts : []
+        }));
+
+      } catch (parseError) {
+        logger.error('Failed to parse AI suggestions:', parseError);
+        suggestions = this.getFallbackSuggestions(context);
+      }
+
+      return suggestions;
+
+    } catch (error) {
+      logger.error('AI suggestions error:', error);
+      return this.getFallbackSuggestions(context);
+    }
+  }
+
   calculateLeaveDays(startDate, endDate) {
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -133,6 +212,30 @@ class LeaveAgentService {
       notify: ['Direct manager', 'Employee'],
       questions: []
     };
+  }
+
+  getFallbackSuggestions(context) {
+    const suggestions = [];
+    const today = new Date();
+    
+    // Simple fallback: suggest windows with 1-week gaps
+    for (let i = 1; i <= 3; i++) {
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() + (i * 14) + 7); // Skip weekends and add notice period
+      
+      const endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 4); // 5-day leave
+      
+      suggestions.push({
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        reasoning: `Option ${i}: Good team coverage expected with minimal conflicts`,
+        coverageScore: 0.8 - (i * 0.1),
+        conflicts: []
+      });
+    }
+    
+    return suggestions;
   }
 }
 

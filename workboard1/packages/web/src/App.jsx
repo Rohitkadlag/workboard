@@ -9,6 +9,18 @@ import Dashboard from './pages/Dashboard.jsx';
 import ProjectsPage from './pages/ProjectsPage.jsx';
 import ProjectBoard from './pages/ProjectBoard.jsx';
 import LeavePage from './pages/LeavePage.jsx';
+import LeaveApprovalsPage from './pages/LeaveApprovalsPage.jsx';
+import TicketsPage from './pages/TicketsPage.jsx';
+import TicketDetailPage from './pages/TicketDetailPage.jsx';
+import { ROLES } from '@workboard/shared';
+
+// Role-based route wrapper
+const RoleGuard = ({ children, allowedRoles, userRole }) => {
+  if (allowedRoles && !allowedRoles.includes(userRole)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+};
 
 function App() {
   return (
@@ -45,11 +57,42 @@ function App() {
               </PrivateRoute>
             } />
             
+            <Route path="/tickets" element={
+              <PrivateRoute>
+                <Layout>
+                  <TicketsPage />
+                </Layout>
+              </PrivateRoute>
+            } />
+            
+            <Route path="/tickets/:id" element={
+              <PrivateRoute>
+                <Layout>
+                  <TicketDetailPage />
+                </Layout>
+              </PrivateRoute>
+            } />
+            
             <Route path="/leave" element={
               <PrivateRoute>
                 <Layout>
                   <LeavePage />
                 </Layout>
+              </PrivateRoute>
+            } />
+            
+            <Route path="/leave/approvals" element={
+              <PrivateRoute>
+                {({ user }) => (
+                  <RoleGuard 
+                    allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]} 
+                    userRole={user?.role}
+                  >
+                    <Layout>
+                      <LeaveApprovalsPage />
+                    </Layout>
+                  </RoleGuard>
+                )}
               </PrivateRoute>
             } />
             

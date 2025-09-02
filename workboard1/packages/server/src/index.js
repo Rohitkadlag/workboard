@@ -10,6 +10,9 @@ const server = createServer(app);
 // Initialize Socket.IO
 const io = initializeSocket(server);
 
+// Make io available to routes
+app.set('io', io);
+
 // Graceful shutdown
 const gracefulShutdown = (signal) => {
   logger.info(`${signal} received, shutting down gracefully`);

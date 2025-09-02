@@ -68,11 +68,29 @@ export const tasksAPI = {
   getByProject: (projectId) => api.get(`/tasks?project=${projectId}`),
   create: (taskData) => api.post('/tasks', taskData),
   updateStatus: (taskId, status) => api.patch(`/tasks/${taskId}/status`, { status }),
+  updateAssignees: (taskId, assignees) => api.patch(`/tasks/${taskId}/assignees`, { assignees }),
 };
 
 export const leaveAPI = {
   submit: (leaveData) => api.post('/leave/submit', leaveData),
   getAll: () => api.get('/leave'),
+  getPending: () => api.get('/leave/pending'),
+  makeDecision: (id, decision, note) => api.patch(`/leave/${id}/decision`, { decision, note }),
+  getSuggestions: (preferences) => api.post('/leave/suggest', preferences),
+};
+
+export const ticketsAPI = {
+  getAll: (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
+    return api.get(`/tickets?${params.toString()}`);
+  },
+  getById: (id) => api.get(`/tickets/${id}`),
+  create: (ticketData) => api.post('/tickets', ticketData),
+  update: (id, updateData) => api.patch(`/tickets/${id}`, updateData),
+  addComment: (id, body) => api.post(`/tickets/${id}/comments`, { body }),
 };
 
 export default api;

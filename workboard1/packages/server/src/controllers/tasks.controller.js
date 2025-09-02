@@ -78,6 +78,15 @@ export const createTask = async (req, res) => {
     await task.save();
     await task.populate('assignees', 'name email');
 
+    // Emit real-time update
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`project:${projectId}`).emit('task:update', {
+        action: 'created',
+        task: task
+      });
+    }
+
     logger.info('Task created:', { taskId: task._id, project: projectId, title });
 
     res.status(201).json({
@@ -121,6 +130,16 @@ export const updateTaskStatus = async (req, res) => {
     await task.save();
     await task.populate('assignees', 'name email');
 
+    // Emit real-time update
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`project:${project._id}`).emit('task:update', {
+        action: 'status_updated',
+        task: task,
+        updatedBy: req.user.name
+      });
+    }
+
     logger.info('Task status updated:', { taskId: task._id, status, updatedBy: req.user._id });
 
     res.json({
@@ -130,5 +149,67 @@ export const updateTaskStatus = async (req, res) => {
   } catch (error) {
     logger.error('Update task status error:', error);
     res.status(500).json({ error: 'Failed to update task status' });
+  }
+};
+
+export const updateTaskAssignees = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { assignees = [] } = req.body;
+
+    if (!Array.isArray(assignees)) {
+      return res.status(400).json({
+        error: 'Assignees must be an array of user IDs'
+      });
+    }
+
+    const task = await Task.findById(id).populate('project');
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    // Verify user has permission to assign tasks
+    const project = task.project;
+    const canAssign = req.user.role === ROLES.ADMIN ||
+      project.manager.toString() === req.user._id.toString();
+
+    if (!canAssign) {
+      return res.status(403).json({ 
+        error: 'Only project managers and admins can assign tasks' 
+      });
+    }
+
+    // Filter assignees to only include project members
+    const validAssignees = assignees.filter(assigneeId => 
+      project.members.some(member => member.toString() === assigneeId)
+    );
+
+    task.assignees = validAssignees;
+    await task.save();
+    await task.populate('assignees', 'name email');
+
+    // Emit real-time update
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`project:${project._id}`).emit('task:update', {
+        action: 'assignees_updated',
+        task: task,
+        updatedBy: req.user.name
+      });
+    }
+
+    logger.info('Task assignees updated:', { 
+      taskId: task._id, 
+      assignees: validAssignees, 
+      updatedBy: req.user._id 
+    });
+
+    res.json({
+      message: 'Task assignees updated successfully',
+      task
+    });
+  } catch (error) {
+    logger.error('Update task assignees error:', error);
+    res.status(500).json({ error: 'Failed to update task assignees' });
   }
 };

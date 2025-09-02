@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { projectsAPI, tasksAPI } from '../utils/api.js';
 import { getSocket, joinProject, broadcastTaskUpdate } from '../utils/socket.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { TASK_STATUS } from '@workboard/shared';
+import { TASK_STATUS, ROLES } from '@workboard/shared';
 import ChatPanel from '../components/ChatPanel.jsx';
 
 const ProjectBoard = () => {
@@ -14,6 +14,7 @@ const ProjectBoard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreateTask, setShowCreateTask] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(null);
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -30,6 +31,9 @@ const ProjectBoard = () => {
     { key: TASK_STATUS.REVIEW, title: 'Review', color: 'bg-purple-100 text-purple-800' },
     { key: TASK_STATUS.DONE, title: 'Done', color: 'bg-green-100 text-green-800' },
   ];
+
+  const canManageTasks = user?.role === ROLES.ADMIN || 
+    (project && project.manager?._id === user?.id);
 
   useEffect(() => {
     fetchProjectData();
@@ -99,6 +103,26 @@ const ProjectBoard = () => {
     } catch (error) {
       console.error('Update task status error:', error);
       setError('Failed to update task status.');
+    }
+  };
+
+  const handleTaskAssignment = async (taskId, assignees) => {
+    try {
+      const response = await tasksAPI.updateAssignees(taskId, assignees);
+      
+      // Update local state
+      setTasks(prev => prev.map(task => 
+        task._id === taskId ? response.data.task : task
+      ));
+
+      // Close modal
+      setShowAssignModal(null);
+
+      // Broadcast to other users
+      broadcastTaskUpdate(projectId, response.data.task);
+    } catch (error) {
+      console.error('Update task assignees error:', error);
+      setError('Failed to update task assignees.');
     }
   };
 
@@ -247,9 +271,20 @@ const ProjectBoard = () => {
                       key={task._id}
                       className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
                     >
-                      <h4 className="font-medium text-gray-900 text-sm mb-2">
-                        {task.title}
-                      </h4>
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-medium text-gray-900 text-sm mb-1">
+                          {task.title}
+                        </h4>
+                        {canManageTasks && (
+                          <button
+                            onClick={() => setShowAssignModal(task._id)}
+                            className="text-xs text-gray-500 hover:text-brand-600 px-1 py-0.5 rounded hover:bg-gray-100"
+                            title="Assign task"
+                          >
+                            👤
+                          </button>
+                        )}
+                      </div>
                       
                       {task.description && (
                         <p className="text-gray-600 text-xs mb-3 line-clamp-2">
@@ -295,8 +330,8 @@ const ProjectBoard = () => {
                         </div>
                       )}
                       
-                      {/* Status change buttons (simplified drag-n-drop) */}
-                      <div className="flex space-x-1">
+                      {/* Status change buttons */}
+                      <div className="flex flex-wrap gap-1">
                         {statusColumns.map((statusOption) => (
                           <button
                             key={statusOption.key}
@@ -335,91 +370,202 @@ const ProjectBoard = () => {
         </div>
       </div>
 
+      {/* Task Assignment Modal */}
+      {showAssignModal && (
+        <TaskAssignModal
+          task={tasks.find(t => t._id === showAssignModal)}
+          project={project}
+          onClose={() => setShowAssignModal(null)}
+          onAssign={handleTaskAssignment}
+        />
+      )}
+
       {/* Create task modal */}
       {showCreateTask && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-screen overflow-y-auto">
-            <h2 className="text-lg font-semibold mb-4">Create New Task</h2>
-            
-            <form onSubmit={handleCreateTask} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Title</label>
-                <input
-                  type="text"
-                  required
-                  className="form-input mt-1"
-                  value={newTask.title}
-                  onChange={(e) => setNewTask({...newTask, title: e.target.value})}
-                  placeholder="Enter task title"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Description</label>
-                <textarea
-                  className="form-textarea mt-1"
-                  rows="3"
-                  value={newTask.description}
-                  onChange={(e) => setNewTask({...newTask, description: e.target.value})}
-                  placeholder="Task description (optional)"
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Due Date</label>
-                  <input
-                    type="date"
-                    className="form-input mt-1"
-                    value={newTask.dueDate}
-                    onChange={(e) => setNewTask({...newTask, dueDate: e.target.value})}
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Story Points</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    className="form-input mt-1"
-                    value={newTask.points}
-                    onChange={(e) => setNewTask({...newTask, points: e.target.value})}
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="submit"
-                  disabled={isCreatingTask}
-                  className="btn btn-primary flex-1"
-                >
-                  {isCreatingTask ? 'Creating...' : 'Create Task'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateTask(false);
-                    setNewTask({
-                      title: '',
-                      description: '',
-                      assignees: [],
-                      dueDate: '',
-                      points: 0,
-                    });
-                    setError('');
-                  }}
-                  className="btn btn-secondary flex-1"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <CreateTaskModal
+          newTask={newTask}
+          setNewTask={setNewTask}
+          project={project}
+          onClose={() => {
+            setShowCreateTask(false);
+            setNewTask({
+              title: '',
+              description: '',
+              assignees: [],
+              dueDate: '',
+              points: 0,
+            });
+            setError('');
+          }}
+          onSubmit={handleCreateTask}
+          isCreating={isCreatingTask}
+        />
       )}
+    </div>
+  );
+};
+
+// Task Assignment Modal Component
+const TaskAssignModal = ({ task, project, onClose, onAssign }) => {
+  const [selectedAssignees, setSelectedAssignees] = useState(
+    task?.assignees?.map(a => a._id) || []
+  );
+
+  const handleAssign = () => {
+    onAssign(task._id, selectedAssignees);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h3 className="text-lg font-semibold mb-4">Assign Task: {task?.title}</h3>
+        
+        <div className="space-y-2 mb-6">
+          {project?.members?.map((member) => (
+            <label key={member._id} className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={selectedAssignees.includes(member._id)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedAssignees(prev => [...prev, member._id]);
+                  } else {
+                    setSelectedAssignees(prev => prev.filter(id => id !== member._id));
+                  }
+                }}
+                className="rounded border-gray-300"
+              />
+              <div className="flex items-center space-x-2">
+                <div className="w-6 h-6 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
+                  {member.name.charAt(0).toUpperCase()}
+                </div>
+                <span className="text-sm">{member.name}</span>
+              </div>
+            </label>
+          ))}
+        </div>
+        
+        <div className="flex space-x-3">
+          <button onClick={handleAssign} className="btn btn-primary flex-1">
+            Assign ({selectedAssignees.length})
+          </button>
+          <button onClick={onClose} className="btn btn-secondary flex-1">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Create Task Modal Component
+const CreateTaskModal = ({ newTask, setNewTask, project, onClose, onSubmit, isCreating }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-screen overflow-y-auto">
+        <h2 className="text-lg font-semibold mb-4">Create New Task</h2>
+        
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Title</label>
+            <input
+              type="text"
+              required
+              className="form-input mt-1"
+              value={newTask.title}
+              onChange={(e) => setNewTask({...newTask, title: e.target.value})}
+              placeholder="Enter task title"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Description</label>
+            <textarea
+              className="form-textarea mt-1"
+              rows="3"
+              value={newTask.description}
+              onChange={(e) => setNewTask({...newTask, description: e.target.value})}
+              placeholder="Task description (optional)"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Assignees</label>
+            <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-200 rounded-md p-2">
+              {project?.members?.map((member) => (
+                <label key={member._id} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={newTask.assignees.includes(member._id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setNewTask(prev => ({
+                          ...prev,
+                          assignees: [...prev.assignees, member._id]
+                        }));
+                      } else {
+                        setNewTask(prev => ({
+                          ...prev,
+                          assignees: prev.assignees.filter(id => id !== member._id)
+                        }));
+                      }
+                    }}
+                    className="rounded border-gray-300"
+                  />
+                  <div className="flex items-center space-x-2">
+                    <div className="w-5 h-5 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
+                      {member.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-sm">{member.name}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Due Date</label>
+              <input
+                type="date"
+                className="form-input mt-1"
+                value={newTask.dueDate}
+                onChange={(e) => setNewTask({...newTask, dueDate: e.target.value})}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Story Points</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                className="form-input mt-1"
+                value={newTask.points}
+                onChange={(e) => setNewTask({...newTask, points: e.target.value})}
+                placeholder="0"
+              />
+            </div>
+          </div>
+          
+          <div className="flex space-x-3 pt-4">
+            <button
+              type="submit"
+              disabled={isCreating}
+              className="btn btn-primary flex-1"
+            >
+              {isCreating ? 'Creating...' : 'Create Task'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-secondary flex-1"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

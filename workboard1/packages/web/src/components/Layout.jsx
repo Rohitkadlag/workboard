@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { ROLES } from '@workboard/shared';
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
@@ -15,8 +16,14 @@ const Layout = ({ children }) => {
   const navItems = [
     { name: 'Dashboard', path: '/', icon: '🏠' },
     { name: 'Projects', path: '/projects', icon: '📋' },
+    { name: 'Tickets', path: '/tickets', icon: '🎫' },
     { name: 'Leave', path: '/leave', icon: '🏖️' },
   ];
+
+  // Add Leave Approvals for Admin/Manager
+  if (user?.role === ROLES.ADMIN || user?.role === ROLES.MANAGER) {
+    navItems.splice(-1, 0, { name: 'Leave Approvals', path: '/leave/approvals', icon: '✅' });
+  }
 
   const isActivePath = (path) => {
     if (path === '/') {

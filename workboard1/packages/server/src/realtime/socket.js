@@ -42,6 +42,11 @@ export const initializeSocket = (server) => {
   io.on('connection', (socket) => {
     logger.info('User connected:', { userId: socket.userId, socketId: socket.id });
 
+    // Join personal room for direct notifications
+    const userRoom = `user:${socket.userId}`;
+    socket.join(userRoom);
+    logger.info('User joined personal room:', { userId: socket.userId, room: userRoom });
+
     // Join project room
     socket.on('join:project', async (data) => {
       try {
@@ -198,6 +203,16 @@ export const initializeSocket = (server) => {
       } catch (error) {
         logger.error('Task update error:', error);
         socket.emit('error', { message: 'Failed to broadcast task update' });
+      }
+    });
+
+    // Handle leaving project rooms
+    socket.on('leave:project', (data) => {
+      const { projectId } = data;
+      if (projectId) {
+        const roomName = `project:${projectId}`;
+        socket.leave(roomName);
+        logger.info('User left project room:', { userId: socket.userId, projectId, roomName });
       }
     });
 
