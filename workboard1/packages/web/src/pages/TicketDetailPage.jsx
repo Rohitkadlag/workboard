@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { ticketsAPI } from '../utils/api.js';
+import { ticketsAPI, usersAPI } from '../utils/api.js';
 import { TICKET_STATUS, TICKET_PRIORITY, TICKET_TYPES, ROLES } from '@workboard/shared';
 
 const TicketDetailPage = () => {
@@ -229,7 +229,8 @@ const TicketDetailPage = () => {
                   status: ticket.status,
                   priority: ticket.priority,
                   title: ticket.title,
-                  description: ticket.description
+                  description: ticket.description,
+                  assignedTo: ticket.assignedTo?._id || ''
                 });
                 setShowUpdateModal(true);
               }}
@@ -414,10 +415,43 @@ const TicketDetailPage = () => {
   );
 };
 
-// Update Modal Component
+// Update Modal Component with Role-based Assignment
 const TicketUpdateModal = ({ ticket, updateData, setUpdateData, onClose, onUpdate, isUpdating, canAssign }) => {
   const { user } = useAuth();
+  const [projectMembers, setProjectMembers] = useState([]);
+  const [membersByRole, setMembersByRole] = useState({});
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [selectedRole, setSelectedRole] = useState('all');
+  
   const isRaiser = ticket?.raisedBy?._id === user?.id;
+
+  useEffect(() => {
+    if (ticket?.project?._id) {
+      fetchProjectMembers();
+    }
+  }, [ticket]);
+
+  const fetchProjectMembers = async () => {
+    try {
+      setIsLoadingMembers(true);
+      const response = await usersAPI.getProjectMembers(ticket.project._id);
+      setProjectMembers(response.data.members || []);
+      setMembersByRole(response.data.membersByRole || {});
+    } catch (error) {
+      console.error('Fetch project members error:', error);
+      // Fallback to existing project members if available
+      setProjectMembers(ticket.project?.members || []);
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  };
+
+  const getFilteredMembers = () => {
+    if (selectedRole === 'all') {
+      return projectMembers;
+    }
+    return membersByRole[selectedRole] || [];
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -460,6 +494,11 @@ const TicketUpdateModal = ({ ticket, updateData, setUpdateData, onClose, onUpdat
                   </option>
                 ))}
               </select>
+              {isRaiser && (
+                <p className="text-xs text-gray-500 mt-1">
+                  You can only close your own tickets
+                </p>
+              )}
             </div>
             
             <div>
@@ -476,24 +515,86 @@ const TicketUpdateModal = ({ ticket, updateData, setUpdateData, onClose, onUpdat
                   </option>
                 ))}
               </select>
+              {!canAssign && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Only managers and admins can change priority
+                </p>
+              )}
             </div>
           </div>
 
           {canAssign && (
             <div>
-              <label className="block text-sm font-medium text-gray-700">Assign to</label>
-              <select
-                className="form-select mt-1"
-                value={updateData.assignedTo || ticket.assignedTo?._id || ''}
-                onChange={(e) => setUpdateData({...updateData, assignedTo: e.target.value || null})}
-              >
-                <option value="">Unassigned</option>
-                {ticket.project?.members?.map((member) => (
-                  <option key={member._id} value={member._id}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">Assign to</label>
+                {!isLoadingMembers && (
+                  <select
+                    className="form-select text-xs"
+                    value={selectedRole}
+                    onChange={(e) => setSelectedRole(e.target.value)}
+                  >
+                    <option value="all">All Roles</option>
+                    <option value={ROLES.ADMIN}>Admins ({membersByRole[ROLES.ADMIN]?.length || 0})</option>
+                    <option value={ROLES.MANAGER}>Managers ({membersByRole[ROLES.MANAGER]?.length || 0})</option>
+                    <option value={ROLES.EMPLOYEE}>Employees ({membersByRole[ROLES.EMPLOYEE]?.length || 0})</option>
+                  </select>
+                )}
+              </div>
+              
+              {isLoadingMembers ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-600 mx-auto"></div>
+                </div>
+              ) : (
+                <select
+                  className="form-select mt-1"
+                  value={updateData.assignedTo || ticket.assignedTo?._id || ''}
+                  onChange={(e) => setUpdateData({...updateData, assignedTo: e.target.value || null})}
+                >
+                  <option value="">Unassigned</option>
+                  {Object.entries(membersByRole).map(([role, users]) => (
+                    users.length > 0 && (
+                      <optgroup key={role} label={`${role}s (${users.length})`}>
+                        {users.map((member) => (
+                          <option key={member._id} value={member._id}>
+                            {member.name} - {member.email}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )
+                  ))}
+                </select>
+              )}
+              
+              {/* Show current assignee info */}
+              {updateData.assignedTo && (
+                <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                  {projectMembers.find(m => m._id === updateData.assignedTo) && (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
+                        {projectMembers.find(m => m._id === updateData.assignedTo).name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium">
+                          {projectMembers.find(m => m._id === updateData.assignedTo).name}
+                        </span>
+                        <span className={`ml-2 px-1 py-0.5 text-xs rounded ${
+                          projectMembers.find(m => m._id === updateData.assignedTo).role === ROLES.ADMIN ? 'bg-red-100 text-red-700' :
+                          projectMembers.find(m => m._id === updateData.assignedTo).role === ROLES.MANAGER ? 'bg-blue-100 text-blue-700' :
+                          'bg-green-100 text-green-700'
+                        }`}>
+                          {projectMembers.find(m => m._id === updateData.assignedTo).role}
+                        </span>
+                        {projectMembers.find(m => m._id === updateData.assignedTo).leaveBalance !== undefined && (
+                          <div className="text-xs text-gray-500">
+                            Leave balance: {projectMembers.find(m => m._id === updateData.assignedTo).leaveBalance} days
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

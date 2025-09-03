@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { ticketsAPI, projectsAPI } from '../utils/api.js';
+import { ticketsAPI, projectsAPI, usersAPI } from '../utils/api.js';
 import { TICKET_TYPES, TICKET_PRIORITY, TICKET_STATUS, ROLES } from '@workboard/shared';
 
 const TicketsPage = () => {
@@ -385,7 +385,7 @@ const TicketsPage = () => {
   );
 };
 
-// Create Ticket Modal Component
+// Create Ticket Modal Component with Role-based Assignment
 const CreateTicketModal = ({ projects, onClose, onCreate }) => {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
@@ -393,10 +393,36 @@ const CreateTicketModal = ({ projects, onClose, onCreate }) => {
     title: '',
     description: '',
     type: TICKET_TYPES.OTHER,
-    priority: TICKET_PRIORITY.MEDIUM
+    priority: TICKET_PRIORITY.MEDIUM,
+    assignedTo: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [projectMembers, setProjectMembers] = useState([]);
+  const [membersByRole, setMembersByRole] = useState({});
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+
+  useEffect(() => {
+    if (formData.project) {
+      fetchProjectMembers();
+    } else {
+      setProjectMembers([]);
+      setMembersByRole({});
+    }
+  }, [formData.project]);
+
+  const fetchProjectMembers = async () => {
+    try {
+      setIsLoadingMembers(true);
+      const response = await usersAPI.getProjectMembers(formData.project);
+      setProjectMembers(response.data.members || []);
+      setMembersByRole(response.data.membersByRole || {});
+    } catch (error) {
+      console.error('Fetch project members error:', error);
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -423,7 +449,7 @@ const CreateTicketModal = ({ projects, onClose, onCreate }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+      <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-screen overflow-y-auto">
         <h2 className="text-lg font-semibold mb-4">Create New Ticket</h2>
         
         {error && (
@@ -439,7 +465,7 @@ const CreateTicketModal = ({ projects, onClose, onCreate }) => {
               required
               className="form-select mt-1"
               value={formData.project}
-              onChange={(e) => setFormData({...formData, project: e.target.value})}
+              onChange={(e) => setFormData({...formData, project: e.target.value, assignedTo: ''})}
             >
               <option value="">Select a project</option>
               {projects.map((project) => (
@@ -505,6 +531,67 @@ const CreateTicketModal = ({ projects, onClose, onCreate }) => {
               placeholder="Detailed description of the ticket..."
             />
           </div>
+
+          {/* Assignment section */}
+          {formData.project && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Assign to (Optional)
+              </label>
+              
+              {isLoadingMembers ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-600 mx-auto"></div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <select
+                    className="form-select"
+                    value={formData.assignedTo}
+                    onChange={(e) => setFormData({...formData, assignedTo: e.target.value})}
+                  >
+                    <option value="">Unassigned</option>
+                    {Object.entries(membersByRole).map(([role, users]) => (
+                      users.length > 0 && (
+                        <optgroup key={role} label={`${role}s (${users.length})`}>
+                          {users.map((member) => (
+                            <option key={member._id} value={member._id}>
+                              {member.name} - {member.email}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )
+                    ))}
+                  </select>
+                  
+                  {/* Show assignee info */}
+                  {formData.assignedTo && (
+                    <div className="p-2 bg-blue-50 border border-blue-200 rounded-md">
+                      {projectMembers.find(m => m._id === formData.assignedTo) && (
+                        <div className="flex items-center space-x-2">
+                          <div className="w-6 h-6 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
+                            {projectMembers.find(m => m._id === formData.assignedTo).name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium">
+                              {projectMembers.find(m => m._id === formData.assignedTo).name}
+                            </span>
+                            <span className={`ml-2 px-1 py-0.5 text-xs rounded ${
+                              projectMembers.find(m => m._id === formData.assignedTo).role === ROLES.ADMIN ? 'bg-red-100 text-red-700' :
+                              projectMembers.find(m => m._id === formData.assignedTo).role === ROLES.MANAGER ? 'bg-blue-100 text-blue-700' :
+                              'bg-green-100 text-green-700'
+                            }`}>
+                              {projectMembers.find(m => m._id === formData.assignedTo).role}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           
           <div className="flex space-x-3 pt-4">
             <button

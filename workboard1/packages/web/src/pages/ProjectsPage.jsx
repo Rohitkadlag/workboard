@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { projectsAPI } from '../utils/api.js';
+import { projectsAPI, usersAPI } from '../utils/api.js';
 import { ROLES } from '@workboard/shared';
 
 const ProjectsPage = () => {
@@ -14,6 +14,7 @@ const ProjectsPage = () => {
     name: '',
     key: '',
     description: '',
+    members: []
   });
   const [isCreating, setIsCreating] = useState(false);
 
@@ -53,7 +54,7 @@ const ProjectsPage = () => {
       await fetchProjects();
       
       // Reset form and close modal
-      setNewProject({ name: '', key: '', description: '' });
+      setNewProject({ name: '', key: '', description: '', members: [] });
       setShowCreateForm(false);
       
     } catch (error) {
@@ -121,73 +122,18 @@ const ProjectsPage = () => {
 
       {/* Create project form */}
       {showCreateForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4">Create New Project</h2>
-            
-            <form onSubmit={handleCreateProject} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Project Name</label>
-                <input
-                  type="text"
-                  required
-                  className="form-input mt-1"
-                  value={newProject.name}
-                  onChange={handleNameChange}
-                  placeholder="Enter project name"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Project Key</label>
-                <input
-                  type="text"
-                  required
-                  className="form-input mt-1"
-                  value={newProject.key}
-                  onChange={(e) => setNewProject({...newProject, key: e.target.value.toUpperCase()})}
-                  placeholder="e.g., PROJ"
-                  maxLength="10"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Unique identifier (auto-generated from name)
-                </p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Description</label>
-                <textarea
-                  className="form-textarea mt-1"
-                  rows="3"
-                  value={newProject.description}
-                  onChange={(e) => setNewProject({...newProject, description: e.target.value})}
-                  placeholder="Project description (optional)"
-                />
-              </div>
-              
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="submit"
-                  disabled={isCreating}
-                  className="btn btn-primary flex-1"
-                >
-                  {isCreating ? 'Creating...' : 'Create Project'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateForm(false);
-                    setNewProject({ name: '', key: '', description: '' });
-                    setError('');
-                  }}
-                  className="btn btn-secondary flex-1"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <CreateProjectModal
+          newProject={newProject}
+          setNewProject={setNewProject}
+          onClose={() => {
+            setShowCreateForm(false);
+            setNewProject({ name: '', key: '', description: '', members: [] });
+            setError('');
+          }}
+          onSubmit={handleCreateProject}
+          onNameChange={handleNameChange}
+          isCreating={isCreating}
+        />
       )}
 
       {/* Projects grid */}
@@ -279,6 +225,239 @@ const ProjectsPage = () => {
           ))}
         </div>
       )}
+    </div>
+  );
+};
+
+// Create Project Modal Component with Role-based User Selection
+const CreateProjectModal = ({ newProject, setNewProject, onClose, onSubmit, onNameChange, isCreating }) => {
+  const [allUsers, setAllUsers] = useState([]);
+  const [usersByRole, setUsersByRole] = useState({});
+  const [selectedRole, setSelectedRole] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setIsLoadingUsers(true);
+      const response = await usersAPI.getByRole();
+      setAllUsers(response.data.users || []);
+      setUsersByRole(response.data.groupedUsers || {});
+    } catch (error) {
+      console.error('Fetch users error:', error);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  const getFilteredUsers = () => {
+    let users = selectedRole === 'all' ? allUsers : (usersByRole[selectedRole] || []);
+    
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase();
+      users = users.filter(user => 
+        user.name.toLowerCase().includes(search) || 
+        user.email.toLowerCase().includes(search)
+      );
+    }
+    
+    return users;
+  };
+
+  const handleMemberToggle = (userId) => {
+    setNewProject(prev => ({
+      ...prev,
+      members: prev.members.includes(userId)
+        ? prev.members.filter(id => id !== userId)
+        : [...prev.members, userId]
+    }));
+  };
+
+  const selectAllRole = (role) => {
+    const roleUsers = usersByRole[role] || [];
+    const roleUserIds = roleUsers.map(user => user._id);
+    
+    setNewProject(prev => ({
+      ...prev,
+      members: [...new Set([...prev.members, ...roleUserIds])]
+    }));
+  };
+
+  const deselectAllRole = (role) => {
+    const roleUsers = usersByRole[role] || [];
+    const roleUserIds = roleUsers.map(user => user._id);
+    
+    setNewProject(prev => ({
+      ...prev,
+      members: prev.members.filter(id => !roleUserIds.includes(id))
+    }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-screen overflow-y-auto">
+        <h2 className="text-lg font-semibold mb-4">Create New Project</h2>
+        
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Project Name</label>
+              <input
+                type="text"
+                required
+                className="form-input mt-1"
+                value={newProject.name}
+                onChange={onNameChange}
+                placeholder="Enter project name"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Project Key</label>
+              <input
+                type="text"
+                required
+                className="form-input mt-1"
+                value={newProject.key}
+                onChange={(e) => setNewProject({...newProject, key: e.target.value.toUpperCase()})}
+                placeholder="e.g., PROJ"
+                maxLength="10"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Unique identifier (auto-generated from name)
+              </p>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Description</label>
+            <textarea
+              className="form-textarea mt-1"
+              rows="3"
+              value={newProject.description}
+              onChange={(e) => setNewProject({...newProject, description: e.target.value})}
+              placeholder="Project description (optional)"
+            />
+          </div>
+          
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Team Members ({newProject.members.length} selected)
+              </label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  className="form-input text-xs px-2 py-1"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <select
+                  className="form-select text-xs"
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                >
+                  <option value="all">All Roles</option>
+                  <option value={ROLES.ADMIN}>Admins ({usersByRole[ROLES.ADMIN]?.length || 0})</option>
+                  <option value={ROLES.MANAGER}>Managers ({usersByRole[ROLES.MANAGER]?.length || 0})</option>
+                  <option value={ROLES.EMPLOYEE}>Employees ({usersByRole[ROLES.EMPLOYEE]?.length || 0})</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Role-based bulk actions */}
+            {selectedRole !== 'all' && usersByRole[selectedRole]?.length > 0 && (
+              <div className="flex space-x-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => selectAllRole(selectedRole)}
+                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                >
+                  Select All {selectedRole}s
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deselectAllRole(selectedRole)}
+                  className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                >
+                  Deselect All {selectedRole}s
+                </button>
+              </div>
+            )}
+            
+            <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-md p-3">
+              {isLoadingUsers ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-600 mx-auto"></div>
+                </div>
+              ) : getFilteredUsers().length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  No users found
+                  {searchTerm && ` matching "${searchTerm}"`}
+                  {selectedRole !== 'all' && ` in ${selectedRole} role`}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {getFilteredUsers().map((userOption) => (
+                    <label key={userOption._id} className="flex items-center space-x-2 p-2 rounded hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={newProject.members.includes(userOption._id)}
+                        onChange={() => handleMemberToggle(userOption._id)}
+                        className="rounded border-gray-300"
+                      />
+                      <div className="flex items-center space-x-2 flex-1">
+                        <div className="w-6 h-6 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
+                          {userOption.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1">
+                          <span className="text-sm font-medium">{userOption.name}</span>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-gray-500">{userOption.email}</span>
+                            <span className={`px-1 py-0.5 text-xs rounded ${
+                              userOption.role === ROLES.ADMIN ? 'bg-red-100 text-red-700' :
+                              userOption.role === ROLES.MANAGER ? 'bg-blue-100 text-blue-700' :
+                              'bg-green-100 text-green-700'
+                            }`}>
+                              {userOption.role}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <p className="text-xs text-gray-500 mt-2">
+              Note: You will automatically be added as a project member and manager
+            </p>
+          </div>
+          
+          <div className="flex space-x-3 pt-4">
+            <button
+              type="submit"
+              disabled={isCreating}
+              className="btn btn-primary flex-1"
+            >
+              {isCreating ? 'Creating...' : 'Create Project'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-secondary flex-1"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

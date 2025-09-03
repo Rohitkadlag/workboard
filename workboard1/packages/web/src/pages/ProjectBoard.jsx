@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { projectsAPI, tasksAPI } from '../utils/api.js';
+import { projectsAPI, tasksAPI, usersAPI } from '../utils/api.js';
 import { getSocket, joinProject, broadcastTaskUpdate } from '../utils/socket.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { TASK_STATUS, ROLES } from '@workboard/shared';
@@ -15,6 +15,8 @@ const ProjectBoard = () => {
   const [error, setError] = useState('');
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(null);
+  const [availableAssignees, setAvailableAssignees] = useState([]);
+  const [assigneesByRole, setAssigneesByRole] = useState({});
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -72,11 +74,28 @@ const ProjectBoard = () => {
 
       setProject(projectResponse.data.project);
       setTasks(tasksResponse.data.tasks || []);
+      
+      // Fetch available assignees for this project
+      fetchAvailableAssignees();
     } catch (error) {
       console.error('Fetch project data error:', error);
       setError(error.response?.data?.error || 'Failed to load project data.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchAvailableAssignees = async (startDate = null, endDate = null) => {
+    try {
+      const response = await usersAPI.getAvailableAssignees(projectId, startDate, endDate);
+      setAvailableAssignees(response.data.assignees);
+      setAssigneesByRole(response.data.assigneesByRole);
+    } catch (error) {
+      console.error('Fetch assignees error:', error);
+      // Fallback to project members if API fails
+      if (project?.members) {
+        setAvailableAssignees(project.members);
+      }
     }
   };
 
@@ -237,7 +256,10 @@ const ProjectBoard = () => {
           </div>
           
           <button
-            onClick={() => setShowCreateTask(true)}
+            onClick={() => {
+              setShowCreateTask(true);
+              fetchAvailableAssignees();
+            }}
             className="btn btn-primary"
           >
             <span className="mr-2">+</span>
@@ -386,6 +408,8 @@ const ProjectBoard = () => {
           newTask={newTask}
           setNewTask={setNewTask}
           project={project}
+          availableAssignees={availableAssignees}
+          assigneesByRole={assigneesByRole}
           onClose={() => {
             setShowCreateTask(false);
             setNewTask({
@@ -398,6 +422,7 @@ const ProjectBoard = () => {
             setError('');
           }}
           onSubmit={handleCreateTask}
+          onDateRangeChange={fetchAvailableAssignees}
           isCreating={isCreatingTask}
         />
       )}
@@ -410,42 +435,92 @@ const TaskAssignModal = ({ task, project, onClose, onAssign }) => {
   const [selectedAssignees, setSelectedAssignees] = useState(
     task?.assignees?.map(a => a._id) || []
   );
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [usersByRole, setUsersByRole] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAvailableUsers();
+  }, [task]);
+
+  const fetchAvailableUsers = async () => {
+    try {
+      setIsLoading(true);
+      const response = await usersAPI.getAvailableAssignees(
+        project._id, 
+        task?.dueDate ? task.dueDate : null, 
+        task?.dueDate ? task.dueDate : null
+      );
+      setAvailableUsers(response.data.assignees);
+      setUsersByRole(response.data.assigneesByRole);
+    } catch (error) {
+      console.error('Fetch available users error:', error);
+      // Fallback to project members
+      setAvailableUsers(project?.members || []);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAssign = () => {
     onAssign(task._id, selectedAssignees);
   };
 
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600 mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-96 overflow-y-auto">
         <h3 className="text-lg font-semibold mb-4">Assign Task: {task?.title}</h3>
         
-        <div className="space-y-2 mb-6">
-          {project?.members?.map((member) => (
-            <label key={member._id} className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={selectedAssignees.includes(member._id)}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedAssignees(prev => [...prev, member._id]);
-                  } else {
-                    setSelectedAssignees(prev => prev.filter(id => id !== member._id));
-                  }
-                }}
-                className="rounded border-gray-300"
-              />
-              <div className="flex items-center space-x-2">
-                <div className="w-6 h-6 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
-                  {member.name.charAt(0).toUpperCase()}
+        <div className="space-y-4">
+          {Object.entries(usersByRole).map(([role, users]) => (
+            users.length > 0 && (
+              <div key={role}>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">
+                  {role}s ({users.length})
+                </h4>
+                <div className="space-y-2 pl-4 border-l-2 border-gray-200">
+                  {users.map((member) => (
+                    <label key={member.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedAssignees.includes(member.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedAssignees(prev => [...prev, member.id]);
+                          } else {
+                            setSelectedAssignees(prev => prev.filter(id => id !== member.id));
+                          }
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      <div className="flex items-center space-x-2">
+                        <div className="w-6 h-6 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
+                          {member.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <span className="text-sm">{member.name}</span>
+                          <div className="text-xs text-gray-500">{member.email}</div>
+                        </div>
+                      </div>
+                    </label>
+                  ))}
                 </div>
-                <span className="text-sm">{member.name}</span>
               </div>
-            </label>
+            )
           ))}
         </div>
         
-        <div className="flex space-x-3">
+        <div className="flex space-x-3 mt-6">
           <button onClick={handleAssign} className="btn btn-primary flex-1">
             Assign ({selectedAssignees.length})
           </button>
@@ -459,7 +534,36 @@ const TaskAssignModal = ({ task, project, onClose, onAssign }) => {
 };
 
 // Create Task Modal Component
-const CreateTaskModal = ({ newTask, setNewTask, project, onClose, onSubmit, isCreating }) => {
+const CreateTaskModal = ({ 
+  newTask, 
+  setNewTask, 
+  project, 
+  availableAssignees,
+  assigneesByRole,
+  onClose, 
+  onSubmit, 
+  onDateRangeChange,
+  isCreating 
+}) => {
+  const [selectedRole, setSelectedRole] = useState('all');
+
+  const handleDateChange = (field, value) => {
+    const updatedTask = { ...newTask, [field]: value };
+    setNewTask(updatedTask);
+    
+    // Fetch updated assignees when date changes
+    if (updatedTask.dueDate) {
+      onDateRangeChange(updatedTask.dueDate, updatedTask.dueDate);
+    }
+  };
+
+  const getDisplayUsers = () => {
+    if (selectedRole === 'all') {
+      return availableAssignees;
+    }
+    return assigneesByRole[selectedRole] || [];
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-screen overflow-y-auto">
@@ -489,40 +593,6 @@ const CreateTaskModal = ({ newTask, setNewTask, project, onClose, onSubmit, isCr
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Assignees</label>
-            <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-200 rounded-md p-2">
-              {project?.members?.map((member) => (
-                <label key={member._id} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={newTask.assignees.includes(member._id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setNewTask(prev => ({
-                          ...prev,
-                          assignees: [...prev.assignees, member._id]
-                        }));
-                      } else {
-                        setNewTask(prev => ({
-                          ...prev,
-                          assignees: prev.assignees.filter(id => id !== member._id)
-                        }));
-                      }
-                    }}
-                    className="rounded border-gray-300"
-                  />
-                  <div className="flex items-center space-x-2">
-                    <div className="w-5 h-5 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
-                      {member.name.charAt(0).toUpperCase()}
-                    </div>
-                    <span className="text-sm">{member.name}</span>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-          
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">Due Date</label>
@@ -530,7 +600,7 @@ const CreateTaskModal = ({ newTask, setNewTask, project, onClose, onSubmit, isCr
                 type="date"
                 className="form-input mt-1"
                 value={newTask.dueDate}
-                onChange={(e) => setNewTask({...newTask, dueDate: e.target.value})}
+                onChange={(e) => handleDateChange('dueDate', e.target.value)}
               />
             </div>
             
@@ -546,6 +616,81 @@ const CreateTaskModal = ({ newTask, setNewTask, project, onClose, onSubmit, isCr
                 placeholder="0"
               />
             </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">Assignees</label>
+              <select
+                className="form-select text-xs"
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+              >
+                <option value="all">All Roles</option>
+                <option value={ROLES.ADMIN}>Admins ({assigneesByRole[ROLES.ADMIN]?.length || 0})</option>
+                <option value={ROLES.MANAGER}>Managers ({assigneesByRole[ROLES.MANAGER]?.length || 0})</option>
+                <option value={ROLES.EMPLOYEE}>Employees ({assigneesByRole[ROLES.EMPLOYEE]?.length || 0})</option>
+              </select>
+            </div>
+            
+            <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-200 rounded-md p-2">
+              {getDisplayUsers().length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-2">
+                  No available assignees
+                  {newTask.dueDate && " for selected date"}
+                </p>
+              ) : (
+                getDisplayUsers().map((member) => (
+                  <label key={member.id || member._id} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={newTask.assignees.includes(member.id || member._id)}
+                      onChange={(e) => {
+                        const memberId = member.id || member._id;
+                        if (e.target.checked) {
+                          setNewTask(prev => ({
+                            ...prev,
+                            assignees: [...prev.assignees, memberId]
+                          }));
+                        } else {
+                          setNewTask(prev => ({
+                            ...prev,
+                            assignees: prev.assignees.filter(id => id !== memberId)
+                          }));
+                        }
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                    <div className="flex items-center space-x-2 flex-1">
+                      <div className="w-5 h-5 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
+                        {member.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                        <span className="text-sm">{member.name}</span>
+                        <span className={`ml-2 px-1 py-0.5 text-xs rounded ${
+                          member.role === ROLES.ADMIN ? 'bg-red-100 text-red-700' :
+                          member.role === ROLES.MANAGER ? 'bg-blue-100 text-blue-700' :
+                          'bg-green-100 text-green-700'
+                        }`}>
+                          {member.role}
+                        </span>
+                        {member.leaveBalance !== undefined && (
+                          <div className="text-xs text-gray-500">
+                            Leave: {member.leaveBalance} days
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </label>
+                ))
+              )}
+            </div>
+            
+            {newTask.dueDate && (
+              <p className="text-xs text-blue-600 mt-1">
+                ℹ️ Showing users available on {new Date(newTask.dueDate).toLocaleDateString()}
+              </p>
+            )}
           </div>
           
           <div className="flex space-x-3 pt-4">

@@ -93,4 +93,40 @@ export const ticketsAPI = {
   addComment: (id, body) => api.post(`/tickets/${id}/comments`, { body }),
 };
 
+export const usersAPI = {
+  // Get all users with optional filters
+  getAll: (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') params.append(key, value);
+    });
+    return api.get(`/users?${params.toString()}`);
+  },
+  
+  // Get users grouped by role
+  getByRole: (roles) => {
+    const params = roles ? `?roles=${roles}` : '';
+    return api.get(`/users/by-role${params}`);
+  },
+  
+  // Get members of a specific project
+  getProjectMembers: (projectId, filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') params.append(key, value);
+    });
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    return api.get(`/users/project/${projectId}/members${queryString}`);
+  },
+  
+  // Get available assignees for a project (excludes users on leave)
+  getAvailableAssignees: (projectId, startDate = null, endDate = null) => {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    return api.get(`/users/project/${projectId}/assignees${queryString}`);
+  }
+};
+
 export default api;
