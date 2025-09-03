@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { ROLES } from '@workboard/shared';
+import NotificationSystem from './NotificationSystem.jsx';
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
@@ -68,6 +69,9 @@ const Layout = ({ children }) => {
 
             {/* User menu */}
             <div className="flex items-center space-x-4">
+              {/* Notifications */}
+              <NotificationSystem />
+              
               <div className="text-sm text-slate-600">
                 <span className="hidden sm:inline">Welcome, </span>
                 <span className="font-medium">{user?.name}</span>

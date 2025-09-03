@@ -28,7 +28,7 @@ export const getTasks = async (req, res) => {
     }
 
     const tasks = await Task.find({ project: projectId })
-      .populate('assignees', 'name email')
+      .populate('assignees', 'name email role')
       .sort({ createdAt: -1 });
 
     res.json({
@@ -52,31 +52,34 @@ export const createTask = async (req, res) => {
     }
 
     // Verify user has access to project
-    const project = await Project.findById(projectId);
+    const project = await Project.findById(projectId).populate('manager', 'name email');
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
 
     const hasAccess = req.user.role === ROLES.ADMIN ||
-      project.manager.toString() === req.user._id.toString() ||
+      project.manager._id.toString() === req.user._id.toString() ||
       project.members.includes(req.user._id);
 
     if (!hasAccess) {
       return res.status(403).json({ error: 'Access denied to this project' });
     }
 
+    // Filter assignees to only include project members
+    const validAssignees = assignees.filter(id => project.members.includes(id));
+
     const task = new Task({
       project: projectId,
       title,
       description,
-      assignees: assignees.filter(id => project.members.includes(id)),
+      assignees: validAssignees,
       dueDate: dueDate ? new Date(dueDate) : undefined,
       points: Math.max(0, parseInt(points) || 0),
       status: TASK_STATUS.BACKLOG
     });
 
     await task.save();
-    await task.populate('assignees', 'name email');
+    await task.populate('assignees', 'name email role');
 
     // Emit real-time update
     const io = req.app.get('io');
@@ -85,9 +88,26 @@ export const createTask = async (req, res) => {
         action: 'created',
         task: task
       });
+
+      // Send assignment notifications to each assignee
+      validAssignees.forEach(assigneeId => {
+        if (assigneeId !== req.user._id.toString()) {
+          io.to(`user:${assigneeId}`).emit('notification', {
+            type: 'task_assigned',
+            title: 'New Task Assigned',
+            message: `You have been assigned to task: ${task.title}`,
+            data: {
+              taskId: task._id,
+              projectName: project.name,
+              assignedBy: req.user.name,
+              dueDate: task.dueDate
+            }
+          });
+        }
+      });
     }
 
-    logger.info('Task created:', { taskId: task._id, project: projectId, title });
+    logger.info('Task created:', { taskId: task._id, project: projectId, title, assignees: validAssignees });
 
     res.status(201).json({
       message: 'Task created successfully',
@@ -111,7 +131,11 @@ export const updateTaskStatus = async (req, res) => {
       });
     }
 
-    const task = await Task.findById(id).populate('project');
+    const task = await Task.findById(id).populate([
+      { path: 'project', populate: { path: 'manager', select: 'name email' } },
+      { path: 'assignees', select: 'name email' }
+    ]);
+    
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
@@ -119,16 +143,16 @@ export const updateTaskStatus = async (req, res) => {
     // Verify user has access to project
     const project = task.project;
     const hasAccess = req.user.role === ROLES.ADMIN ||
-      project.manager.toString() === req.user._id.toString() ||
+      project.manager._id.toString() === req.user._id.toString() ||
       project.members.includes(req.user._id);
 
     if (!hasAccess) {
       return res.status(403).json({ error: 'Access denied to this task' });
     }
 
+    const oldStatus = task.status;
     task.status = status;
     await task.save();
-    await task.populate('assignees', 'name email');
 
     // Emit real-time update
     const io = req.app.get('io');
@@ -137,6 +161,24 @@ export const updateTaskStatus = async (req, res) => {
         action: 'status_updated',
         task: task,
         updatedBy: req.user.name
+      });
+
+      // Notify assignees about status change (except the updater)
+      task.assignees.forEach(assignee => {
+        if (assignee._id.toString() !== req.user._id.toString()) {
+          io.to(`user:${assignee._id}`).emit('notification', {
+            type: 'task_status_changed',
+            title: 'Task Status Updated',
+            message: `Task "${task.title}" status changed from ${oldStatus.replace('_', ' ')} to ${status.replace('_', ' ')}`,
+            data: {
+              taskId: task._id,
+              projectName: project.name,
+              oldStatus,
+              newStatus: status,
+              updatedBy: req.user.name
+            }
+          });
+        }
       });
     }
 
@@ -163,7 +205,11 @@ export const updateTaskAssignees = async (req, res) => {
       });
     }
 
-    const task = await Task.findById(id).populate('project');
+    const task = await Task.findById(id).populate([
+      { path: 'project', populate: { path: 'manager', select: 'name email' } },
+      { path: 'assignees', select: 'name email' }
+    ]);
+    
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
@@ -171,7 +217,7 @@ export const updateTaskAssignees = async (req, res) => {
     // Verify user has permission to assign tasks
     const project = task.project;
     const canAssign = req.user.role === ROLES.ADMIN ||
-      project.manager.toString() === req.user._id.toString();
+      project.manager._id.toString() === req.user._id.toString();
 
     if (!canAssign) {
       return res.status(403).json({ 
@@ -184,9 +230,10 @@ export const updateTaskAssignees = async (req, res) => {
       project.members.some(member => member.toString() === assigneeId)
     );
 
+    const oldAssignees = task.assignees.map(a => a._id.toString());
     task.assignees = validAssignees;
     await task.save();
-    await task.populate('assignees', 'name email');
+    await task.populate('assignees', 'name email role');
 
     // Emit real-time update
     const io = req.app.get('io');
@@ -195,6 +242,44 @@ export const updateTaskAssignees = async (req, res) => {
         action: 'assignees_updated',
         task: task,
         updatedBy: req.user.name
+      });
+
+      // Determine who was added/removed
+      const newAssignees = validAssignees;
+      const addedAssignees = newAssignees.filter(id => !oldAssignees.includes(id));
+      const removedAssignees = oldAssignees.filter(id => !newAssignees.includes(id));
+
+      // Notify newly assigned users
+      addedAssignees.forEach(assigneeId => {
+        if (assigneeId !== req.user._id.toString()) {
+          io.to(`user:${assigneeId}`).emit('notification', {
+            type: 'task_assigned',
+            title: 'Task Assigned',
+            message: `You have been assigned to task: ${task.title}`,
+            data: {
+              taskId: task._id,
+              projectName: project.name,
+              assignedBy: req.user.name,
+              dueDate: task.dueDate
+            }
+          });
+        }
+      });
+
+      // Notify removed assignees
+      removedAssignees.forEach(assigneeId => {
+        if (assigneeId !== req.user._id.toString()) {
+          io.to(`user:${assigneeId}`).emit('notification', {
+            type: 'task_unassigned',
+            title: 'Task Unassigned',
+            message: `You have been unassigned from task: ${task.title}`,
+            data: {
+              taskId: task._id,
+              projectName: project.name,
+              unassignedBy: req.user.name
+            }
+          });
+        }
       });
     }
 

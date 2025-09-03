@@ -1,27 +1,32 @@
 import { io } from 'socket.io-client';
 import { getToken } from './api.js';
 
-const SOCKET_URL = 'http://localhost:5001';
-
 let socket = null;
 
 export const initializeSocket = () => {
+  if (socket && socket.connected) {
+    return socket;
+  }
+
   const token = getToken();
-  
   if (!token) {
-    console.warn('No auth token found, cannot initialize socket');
+    console.warn('No auth token available for socket connection');
     return null;
   }
 
-  if (socket) {
-    socket.disconnect();
-  }
+  const socketUrl = window.location.hostname === 'localhost' 
+    ? 'http://localhost:5001' 
+    : `${window.location.protocol}//${window.location.hostname}:5001`;
 
-  socket = io(SOCKET_URL, {
+  socket = io(socketUrl, {
     auth: {
-      token: token
+      token
     },
-    autoConnect: true
+    autoConnect: true,
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionAttempts: 5,
+    timeout: 20000
   });
 
   socket.on('connect', () => {
@@ -32,21 +37,67 @@ export const initializeSocket = () => {
     console.log('Socket disconnected:', reason);
   });
 
-  socket.on('error', (error) => {
-    console.error('Socket error:', error);
+  socket.on('connect_error', (error) => {
+    console.error('Socket connection error:', error);
   });
 
-  // Listen for leave decisions
-  socket.on('leave:decision', (data) => {
-    console.log('Leave decision received:', data);
-    // Dispatch custom event that components can listen to
-    window.dispatchEvent(new CustomEvent('leaveDecision', { detail: data }));
+  // Handle notification events
+  socket.on('notification', (notification) => {
+    console.log('Received notification:', notification);
+    
+    // Dispatch custom event for notification system
+    window.dispatchEvent(new CustomEvent('socketNotification', { 
+      detail: notification 
+    }));
   });
 
-  // Listen for ticket updates
+  // Handle task events
+  socket.on('task:update', (data) => {
+    console.log('Task update received:', data);
+    
+    // Dispatch custom event for task updates
+    window.dispatchEvent(new CustomEvent('taskUpdate', { 
+      detail: data 
+    }));
+  });
+
+  // Handle ticket events
   socket.on('ticket:update', (data) => {
     console.log('Ticket update received:', data);
-    window.dispatchEvent(new CustomEvent('ticketUpdate', { detail: data }));
+    
+    // Dispatch custom event for ticket updates
+    window.dispatchEvent(new CustomEvent('ticketUpdate', { 
+      detail: data 
+    }));
+  });
+
+  // Handle project events
+  socket.on('project:update', (data) => {
+    console.log('Project update received:', data);
+    
+    // Dispatch custom event for project updates
+    window.dispatchEvent(new CustomEvent('projectUpdate', { 
+      detail: data 
+    }));
+  });
+
+  // Handle leave decision events
+  socket.on('leave:decision', (data) => {
+    console.log('Leave decision received:', data);
+    
+    // Dispatch custom event for leave decisions
+    window.dispatchEvent(new CustomEvent('leaveDecision', { 
+      detail: data 
+    }));
+  });
+
+  // Handle chat events
+  socket.on('message:new', (data) => {
+    console.log('New message received:', data);
+  });
+
+  socket.on('messages:history', (data) => {
+    console.log('Messages history received:', data);
   });
 
   return socket;
@@ -63,37 +114,66 @@ export const disconnectSocket = () => {
   }
 };
 
-// Socket event helpers
+// Project-related socket functions
 export const joinProject = (projectId) => {
-  if (socket) {
+  if (socket && socket.connected) {
     socket.emit('join:project', { projectId });
   }
 };
 
 export const leaveProject = (projectId) => {
-  if (socket) {
+  if (socket && socket.connected) {
     socket.emit('leave:project', { projectId });
   }
 };
 
-export const sendMessage = (projectId, message) => {
-  if (socket) {
-    socket.emit('chat:message', { projectId, message });
-  }
-};
-
 export const broadcastTaskUpdate = (projectId, task) => {
-  if (socket) {
-    socket.emit('task:update', { projectId, task });
+  if (socket && socket.connected) {
+    socket.emit('task:broadcast', { projectId, task });
   }
 };
 
-export default {
-  initializeSocket,
-  getSocket,
-  disconnectSocket,
-  joinProject,
-  leaveProject,
-  sendMessage,
-  broadcastTaskUpdate
+export const broadcastTicketUpdate = (projectId, ticket) => {
+  if (socket && socket.connected) {
+    socket.emit('ticket:broadcast', { projectId, ticket });
+  }
 };
+
+// Chat functions
+export const sendMessage = (projectId, message) => {
+  if (socket && socket.connected) {
+    socket.emit('message:send', { projectId, message });
+  }
+};
+
+// User presence functions
+export const joinUserRoom = (userId) => {
+  if (socket && socket.connected) {
+    socket.emit('join:user', { userId });
+  }
+};
+
+export const leaveUserRoom = (userId) => {
+  if (socket && socket.connected) {
+    socket.emit('leave:user', { userId });
+  }
+};
+
+// Notification acknowledgment
+export const acknowledgeNotification = (notificationId) => {
+  if (socket && socket.connected) {
+    socket.emit('notification:acknowledge', { notificationId });
+  }
+};
+
+// Helper function to emit custom events with error handling
+const emitSocketEvent = (eventName, data) => {
+  if (socket && socket.connected) {
+    socket.emit(eventName, data);
+    return true;
+  }
+  console.warn(`Cannot emit ${eventName}: socket not connected`);
+  return false;
+};
+
+export { emitSocketEvent };

@@ -5,7 +5,7 @@ import { ROLES, TICKET_STATUS, TICKET_TYPES, TICKET_PRIORITY } from '@workboard/
 
 export const createTicket = async (req, res) => {
   try {
-    const { project: projectId, title, description, type = 'OTHER', priority = 'MEDIUM' } = req.body;
+    const { project: projectId, title, description, type = 'OTHER', priority = 'MEDIUM', assignedTo } = req.body;
 
     if (!projectId || !title || !description) {
       return res.status(400).json({
@@ -36,6 +36,11 @@ export const createTicket = async (req, res) => {
       return res.status(400).json({ error: 'Invalid ticket priority' });
     }
 
+    // Validate assignedTo if provided
+    if (assignedTo && !project.members.includes(assignedTo)) {
+      return res.status(400).json({ error: 'Assignee must be a project member' });
+    }
+
     const ticket = new Ticket({
       project: projectId,
       raisedBy: req.user._id,
@@ -43,6 +48,7 @@ export const createTicket = async (req, res) => {
       description: description.trim(),
       type,
       priority,
+      assignedTo: assignedTo || null,
       watchers: [req.user._id] // Auto-add raiser as watcher
     });
 
@@ -50,7 +56,7 @@ export const createTicket = async (req, res) => {
     await ticket.populate([
       { path: 'raisedBy', select: 'name email role' },
       { path: 'assignedTo', select: 'name email role' },
-      { path: 'project', select: 'name key' },
+      { path: 'project', select: 'name key manager members' },
       { path: 'watchers', select: 'name email' },
       { path: 'comments.author', select: 'name email' }
     ]);
@@ -62,9 +68,23 @@ export const createTicket = async (req, res) => {
         action: 'created',
         ticket: ticket
       });
+
+      // Send assignment notification if ticket is assigned
+      if (assignedTo && assignedTo !== req.user._id.toString()) {
+        io.to(`user:${assignedTo}`).emit('notification', {
+          type: 'ticket_assigned',
+          title: 'New Ticket Assigned',
+          message: `You have been assigned to ticket: ${ticket.title}`,
+          data: {
+            ticketId: ticket._id,
+            projectName: project.name,
+            assignedBy: req.user.name
+          }
+        });
+      }
     }
 
-    logger.info('Ticket created:', { ticketId: ticket._id, project: projectId, raisedBy: req.user._id });
+    logger.info('Ticket created:', { ticketId: ticket._id, project: projectId, raisedBy: req.user._id, assignedTo });
 
     res.status(201).json({
       message: 'Ticket created successfully',
@@ -128,7 +148,7 @@ export const getTickets = async (req, res) => {
     const tickets = await Ticket.find(query)
       .populate('raisedBy', 'name email role')
       .populate('assignedTo', 'name email role')
-      .populate('project', 'name key')
+      .populate('project', 'name key manager')
       .populate('watchers', 'name email')
       .sort({ createdAt: -1 });
 
@@ -150,7 +170,7 @@ export const getTicket = async (req, res) => {
     const ticket = await Ticket.findById(id)
       .populate('raisedBy', 'name email role')
       .populate('assignedTo', 'name email role')
-      .populate('project', 'name key')
+      .populate('project', 'name key manager members')
       .populate('watchers', 'name email')
       .populate('comments.author', 'name email');
 
@@ -181,32 +201,41 @@ export const updateTicket = async (req, res) => {
     const { id } = req.params;
     const { status, assignedTo, priority, title, description } = req.body;
 
-    const ticket = await Ticket.findById(id).populate('project');
+    const ticket = await Ticket.findById(id).populate([
+      { path: 'project', populate: { path: 'manager', select: 'name email' } },
+      { path: 'raisedBy', select: 'name email' },
+      { path: 'assignedTo', select: 'name email' }
+    ]);
+    
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    // Check permissions
+    if (ticket.status !== TICKET_STATUS.OPEN && ticket.status !== TICKET_STATUS.IN_PROGRESS) {
+      return res.status(400).json({ error: 'Cannot update resolved or closed tickets' });
+    }
+
+    // Check permissions - FIXED AUTHORIZATION LOGIC
     const project = ticket.project;
-    const isProjectManager = project.manager.toString() === req.user._id.toString();
+    const isProjectManager = project.manager._id.toString() === req.user._id.toString();
     const isAdmin = req.user.role === ROLES.ADMIN;
-    const isRaiser = ticket.raisedBy.toString() === req.user._id.toString();
+    const isRaiser = ticket.raisedBy._id.toString() === req.user._id.toString();
 
     // Only admin, project manager, or raiser can update tickets
-    // Raiser can only close their own tickets
     if (!isAdmin && !isProjectManager && !isRaiser) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
     const updates = {};
+    const oldAssignedTo = ticket.assignedTo?._id?.toString();
     
     // Status updates
     if (status && Object.values(TICKET_STATUS).includes(status)) {
-      if (isRaiser && status !== TICKET_STATUS.CLOSED) {
-        return res.status(403).json({ error: 'You can only close your own tickets' });
-      }
-      if (!isAdmin && !isProjectManager && status !== TICKET_STATUS.CLOSED) {
-        return res.status(403).json({ error: 'Only managers and admins can change ticket status' });
+      // Raisers can only close their own tickets
+      if (isRaiser && !isAdmin && !isProjectManager) {
+        if (status !== TICKET_STATUS.CLOSED) {
+          return res.status(403).json({ error: 'You can only close your own tickets' });
+        }
       }
       updates.status = status;
     }
@@ -252,7 +281,7 @@ export const updateTicket = async (req, res) => {
     await ticket.populate([
       { path: 'raisedBy', select: 'name email role' },
       { path: 'assignedTo', select: 'name email role' },
-      { path: 'project', select: 'name key' },
+      { path: 'project', select: 'name key manager members' },
       { path: 'watchers', select: 'name email' }
     ]);
 
@@ -264,6 +293,61 @@ export const updateTicket = async (req, res) => {
         ticket: ticket,
         updatedBy: req.user.name
       });
+
+      // Send assignment notification if assignee changed
+      if (updates.assignedTo !== undefined) {
+        const newAssignedTo = updates.assignedTo?.toString();
+        
+        // Notify old assignee about unassignment
+        if (oldAssignedTo && oldAssignedTo !== newAssignedTo && oldAssignedTo !== req.user._id.toString()) {
+          io.to(`user:${oldAssignedTo}`).emit('notification', {
+            type: 'ticket_unassigned',
+            title: 'Ticket Unassigned',
+            message: `You have been unassigned from ticket: ${ticket.title}`,
+            data: {
+              ticketId: ticket._id,
+              projectName: project.name,
+              updatedBy: req.user.name
+            }
+          });
+        }
+        
+        // Notify new assignee about assignment
+        if (newAssignedTo && newAssignedTo !== oldAssignedTo && newAssignedTo !== req.user._id.toString()) {
+          io.to(`user:${newAssignedTo}`).emit('notification', {
+            type: 'ticket_assigned',
+            title: 'Ticket Assigned',
+            message: `You have been assigned to ticket: ${ticket.title}`,
+            data: {
+              ticketId: ticket._id,
+              projectName: project.name,
+              assignedBy: req.user.name
+            }
+          });
+        }
+      }
+
+      // Notify about status changes
+      if (updates.status && updates.status !== ticket.status) {
+        const statusMessage = `Ticket status changed to: ${updates.status.replace('_', ' ')}`;
+        
+        // Notify all watchers except the updater
+        ticket.watchers.forEach(watcherId => {
+          if (watcherId.toString() !== req.user._id.toString()) {
+            io.to(`user:${watcherId}`).emit('notification', {
+              type: 'ticket_status_changed',
+              title: 'Ticket Status Updated',
+              message: statusMessage,
+              data: {
+                ticketId: ticket._id,
+                projectName: project.name,
+                newStatus: updates.status,
+                updatedBy: req.user.name
+              }
+            });
+          }
+        });
+      }
     }
 
     logger.info('Ticket updated:', { ticketId: id, updates, updatedBy: req.user._id });
@@ -288,7 +372,11 @@ export const addComment = async (req, res) => {
       return res.status(400).json({ error: 'Comment body is required' });
     }
 
-    const ticket = await Ticket.findById(id).populate('project');
+    const ticket = await Ticket.findById(id).populate([
+      { path: 'project', select: 'name key manager members' },
+      { path: 'watchers', select: 'name email' }
+    ]);
+    
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
@@ -333,6 +421,23 @@ export const addComment = async (req, res) => {
         action: 'comment_added',
         ticketId: ticket._id,
         comment: newComment
+      });
+
+      // Notify all watchers except the commenter
+      ticket.watchers.forEach(watcherId => {
+        if (watcherId.toString() !== req.user._id.toString()) {
+          io.to(`user:${watcherId}`).emit('notification', {
+            type: 'ticket_comment',
+            title: 'New Comment on Ticket',
+            message: `${req.user.name} commented on: ${ticket.title}`,
+            data: {
+              ticketId: ticket._id,
+              projectName: project.name,
+              commentBy: req.user.name,
+              commentPreview: body.trim().substring(0, 100) + (body.trim().length > 100 ? '...' : '')
+            }
+          });
+        }
       });
     }
 

@@ -104,7 +104,8 @@ const TicketDetailPage = () => {
     if (!ticket || !user) return false;
     
     const isAdmin = user.role === ROLES.ADMIN;
-    const isProjectManager = ticket.project?.manager === user.id;
+    const isProjectManager = ticket.project?.manager?._id === user.id || 
+                           ticket.project?.manager?.toString() === user.id;
     const isRaiser = ticket.raisedBy?._id === user.id;
     
     return isAdmin || isProjectManager || isRaiser;
@@ -114,7 +115,8 @@ const TicketDetailPage = () => {
     if (!ticket || !user) return false;
     
     const isAdmin = user.role === ROLES.ADMIN;
-    const isProjectManager = ticket.project?.manager === user.id;
+    const isProjectManager = ticket.project?.manager?._id === user.id || 
+                           ticket.project?.manager?.toString() === user.id;
     
     return isAdmin || isProjectManager;
   };
