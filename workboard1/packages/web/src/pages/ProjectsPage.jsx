@@ -10,6 +10,8 @@ const ProjectsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(null);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
   const [newProject, setNewProject] = useState({
     name: '',
     key: '',
@@ -65,6 +67,28 @@ const ProjectsPage = () => {
     }
   };
 
+  const handleDeleteProject = async (projectId) => {
+    try {
+      setIsDeletingProject(true);
+      setError('');
+      
+      await projectsAPI.delete(projectId);
+      
+      // Remove from local state
+      setProjects(prev => prev.filter(p => p._id !== projectId));
+      setShowDeleteModal(null);
+      
+      // Show success message
+      console.log('Project deleted successfully');
+      
+    } catch (error) {
+      console.error('Delete project error:', error);
+      setError(error.response?.data?.error || 'Failed to delete project. Please try again.');
+    } finally {
+      setIsDeletingProject(false);
+    }
+  };
+
   const generateKeyFromName = (name) => {
     return name
       .toUpperCase()
@@ -85,6 +109,7 @@ const ProjectsPage = () => {
   };
 
   const canCreateProject = user?.role === ROLES.ADMIN || user?.role === ROLES.MANAGER;
+  const canDeleteProject = user?.role === ROLES.ADMIN;
 
   if (isLoading) {
     return (
@@ -136,6 +161,16 @@ const ProjectsPage = () => {
         />
       )}
 
+      {/* Delete confirmation modal */}
+      {showDeleteModal && (
+        <DeleteProjectModal
+          project={showDeleteModal}
+          onClose={() => setShowDeleteModal(null)}
+          onConfirm={() => handleDeleteProject(showDeleteModal._id)}
+          isDeleting={isDeletingProject}
+        />
+      )}
+
       {/* Projects grid */}
       {projects.length === 0 ? (
         <div className="text-center py-12">
@@ -159,20 +194,35 @@ const ProjectsPage = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.map((project) => (
-            <Link
+            <div
               key={project._id}
-              to={`/projects/${project._id}`}
-              className="block bg-white rounded-lg shadow-sm border border-gray-200 hover:border-brand-300 hover:shadow-md transition-all"
+              className="bg-white rounded-lg shadow-sm border border-gray-200 hover:border-brand-300 hover:shadow-md transition-all"
             >
               <div className="p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                      {project.name}
-                    </h3>
-                    <span className="inline-block px-2 py-1 bg-brand-100 text-brand-800 text-xs font-medium rounded-md">
-                      {project.key}
-                    </span>
+                    <Link
+                      to={`/projects/${project._id}`}
+                      className="block hover:text-brand-600"
+                    >
+                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                        {project.name}
+                      </h3>
+                    </Link>
+                    <div className="flex items-center space-x-2">
+                      <span className="inline-block px-2 py-1 bg-brand-100 text-brand-800 text-xs font-medium rounded-md">
+                        {project.key}
+                      </span>
+                      {canDeleteProject && (
+                        <button
+                          onClick={() => setShowDeleteModal(project)}
+                          className="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50"
+                          title="Delete project"
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
@@ -220,11 +270,98 @@ const ProjectsPage = () => {
                     </div>
                   </div>
                 )}
+
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <Link
+                    to={`/projects/${project._id}`}
+                    className="btn btn-outline btn-sm w-full"
+                  >
+                    View Project →
+                  </Link>
+                </div>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}
+    </div>
+  );
+};
+
+// Delete Project Modal Component
+const DeleteProjectModal = ({ project, onClose, onConfirm, isDeleting }) => {
+  const [confirmText, setConfirmText] = useState('');
+  const expectedText = project.key;
+
+  const canDelete = confirmText === expectedText;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="flex items-center mb-4">
+          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
+            <span className="text-2xl">⚠️</span>
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Delete Project</h2>
+            <p className="text-sm text-gray-600">This action cannot be undone</p>
+          </div>
+        </div>
+        
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+          <h3 className="font-medium text-red-800 mb-2">
+            "{project.name}" will be permanently deleted
+          </h3>
+          <div className="text-sm text-red-700 space-y-1">
+            <p>• All tasks in this project will be deleted</p>
+            <p>• All tickets will be deleted</p>
+            <p>• All project messages will be deleted</p>
+            <p>• {project.members?.length || 0} team members will be notified</p>
+          </div>
+        </div>
+        
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Type <strong>{expectedText}</strong> to confirm deletion:
+          </label>
+          <input
+            type="text"
+            className="form-input w-full"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder={`Enter ${expectedText}`}
+            autoFocus
+          />
+        </div>
+        
+        <div className="flex space-x-3">
+          <button
+            onClick={onConfirm}
+            disabled={!canDelete || isDeleting}
+            className="btn bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex-1"
+          >
+            {isDeleting ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin -ml-1 mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                Deleting...
+              </div>
+            ) : (
+              'Delete Project'
+            )}
+          </button>
+          <button
+            onClick={onClose}
+            disabled={isDeleting}
+            className="btn btn-secondary flex-1"
+          >
+            Cancel
+          </button>
+        </div>
+        
+        <p className="text-xs text-gray-500 mt-3 text-center">
+          Only administrators can delete projects
+        </p>
+      </div>
     </div>
   );
 };

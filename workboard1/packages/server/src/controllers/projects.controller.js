@@ -235,3 +235,114 @@ export const updateProject = async (req, res) => {
     res.status(500).json({ error: 'Failed to update project' });
   }
 };
+
+export const deleteProject = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Only admins can delete projects
+    if (req.user.role !== ROLES.ADMIN) {
+      return res.status(403).json({ 
+        error: 'Only administrators can delete projects' 
+      });
+    }
+
+    const project = await Project.findById(id).populate('members', 'name email');
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    // Check if project has associated data (tasks, tickets, etc.)
+    const Task = (await import('../models/Task.js')).default;
+    const Ticket = (await import('../models/Ticket.js')).default;
+    const Message = (await import('../models/Message.js')).default;
+
+    const [taskCount, ticketCount, messageCount] = await Promise.all([
+      Task.countDocuments({ project: id }),
+      Ticket.countDocuments({ project: id }),
+      Message.countDocuments({ project: id })
+    ]);
+
+    const totalData = taskCount + ticketCount + messageCount;
+
+    // Store project data for notifications before deletion
+    const projectData = {
+      id: project._id,
+      name: project.name,
+      key: project.key,
+      members: project.members.map(m => m._id.toString()),
+      manager: project.manager.toString()
+    };
+
+    if (totalData > 0) {
+      // Delete associated data first
+      await Promise.all([
+        Task.deleteMany({ project: id }),
+        Ticket.deleteMany({ project: id }),
+        Message.deleteMany({ project: id })
+      ]);
+
+      logger.info('Deleted project data:', {
+        projectId: id,
+        tasks: taskCount,
+        tickets: ticketCount,
+        messages: messageCount
+      });
+    }
+
+    // Delete the project
+    await Project.findByIdAndDelete(id);
+
+    // Emit notifications to all project members
+    const io = req.app.get('io');
+    if (io) {
+      // Notify all project members about deletion
+      projectData.members.forEach(memberId => {
+        if (memberId !== req.user._id.toString()) {
+          io.to(`user:${memberId}`).emit('notification', {
+            type: 'project_deleted',
+            title: 'Project Deleted',
+            message: `Project "${projectData.name}" has been deleted by administrator`,
+            data: {
+              projectName: projectData.name,
+              projectKey: projectData.key,
+              deletedBy: req.user.name,
+              dataDeleted: {
+                tasks: taskCount,
+                tickets: ticketCount,
+                messages: messageCount
+              }
+            }
+          });
+        }
+      });
+
+      // Emit project deletion event
+      io.to(`project:${id}`).emit('project:deleted', {
+        projectId: id,
+        projectName: projectData.name,
+        deletedBy: req.user.name
+      });
+    }
+
+    logger.info('Project deleted:', { 
+      projectId: id, 
+      projectName: projectData.name,
+      deletedBy: req.user._id,
+      totalDataDeleted: totalData
+    });
+
+    res.json({
+      message: 'Project and all associated data deleted successfully',
+      deletedData: {
+        tasks: taskCount,
+        tickets: ticketCount,
+        messages: messageCount
+      }
+    });
+
+  } catch (error) {
+    logger.error('Delete project error:', error);
+    res.status(500).json({ error: 'Failed to delete project' });
+  }
+};
