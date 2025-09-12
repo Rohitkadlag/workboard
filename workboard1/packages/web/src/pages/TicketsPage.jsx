@@ -140,24 +140,24 @@ const TicketsPage = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-brand-500/30 border-t-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-brand-50 to-white border border-brand-100 shadow-sm p-6 sm:p-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tickets</h1>
-          <p className="text-gray-600">Track issues, requests, and project tickets</p>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-900">Tickets</h1>
+          <p className="mt-1 text-gray-600">Track issues, requests, and project tickets</p>
         </div>
         
         <button
           onClick={() => setShowCreateModal(true)}
-          className="btn btn-primary"
+          className="inline-flex items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
         >
           <span className="mr-2">+</span>
           Create Ticket
@@ -165,11 +165,11 @@ const TicketsPage = () => {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <div className="text-sm text-red-700">{error}</div>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <div className="text-sm font-medium text-red-700">{error}</div>
           <button
             onClick={fetchData}
-            className="mt-2 btn btn-sm btn-outline"
+            className="mt-3 inline-flex items-center rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100"
           >
             Try Again
           </button>
@@ -177,8 +177,8 @@ const TicketsPage = () => {
       )}
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
           <button
             onClick={clearFilters}
@@ -188,11 +188,11 @@ const TicketsPage = () => {
           </button>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Project</label>
             <select
-              className="form-select"
+              className="w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               value={filters.project}
               onChange={(e) => handleFilterChange('project', e.target.value)}
             >
@@ -206,9 +206,9 @@ const TicketsPage = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
             <select
-              className="form-select"
+              className="w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
             >
@@ -222,9 +222,9 @@ const TicketsPage = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Priority</label>
             <select
-              className="form-select"
+              className="w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               value={filters.priority}
               onChange={(e) => handleFilterChange('priority', e.target.value)}
             >
@@ -238,9 +238,9 @@ const TicketsPage = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Type</label>
             <select
-              className="form-select"
+              className="w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               value={filters.type}
               onChange={(e) => handleFilterChange('type', e.target.value)}
             >
@@ -257,46 +257,46 @@ const TicketsPage = () => {
 
       {/* Tickets List */}
       {tickets.length === 0 ? (
-        <div className="text-center py-12">
-          <span className="text-6xl mb-4 block">🎫</span>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No tickets found</h3>
-          <p className="text-gray-600 mb-6">
+        <div className="rounded-2xl border border-gray-100 bg-white p-12 text-center shadow-sm">
+          <span className="mb-4 block text-6xl">🎫</span>
+          <h3 className="mb-2 text-lg font-medium text-gray-900">No tickets found</h3>
+          <p className="mb-6 text-gray-600">
             Create your first ticket to track issues and requests
           </p>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="btn btn-primary"
+            className="inline-flex items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
           >
             Create Ticket
           </button>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Ticket
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Project
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Priority
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Assigned
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Created
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-100 bg-white">
                 {tickets.map((ticket) => (
                   <tr key={ticket._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
@@ -305,16 +305,16 @@ const TicketsPage = () => {
                         className="block hover:text-brand-600"
                       >
                         <div className="flex items-start space-x-3">
-                          <span className="text-xl mt-0.5">{getTypeIcon(ticket.type)}</span>
+                          <span className="mt-0.5 text-xl">{getTypeIcon(ticket.type)}</span>
                           <div>
                             <div className="text-sm font-medium text-gray-900">
                               {ticket.title}
                             </div>
-                            <div className="text-sm text-gray-500 max-w-xs truncate">
+                            <div className="max-w-xs truncate text-sm text-gray-500">
                               {ticket.description}
                             </div>
                             {ticket.comments?.length > 0 && (
-                              <div className="text-xs text-gray-400 mt-1">
+                              <div className="mt-1 text-xs text-gray-400">
                                 💬 {ticket.comments.length} comments
                               </div>
                             )}
@@ -331,19 +331,19 @@ const TicketsPage = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(ticket.status)}`}>
+                      <span className={`rounded-full px-2 py-1 text-xs ring-1 ring-inset ${getStatusColor(ticket.status)}`}>
                         {ticket.status.replace('_', ' ')}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs rounded-full ${getPriorityColor(ticket.priority)}`}>
+                      <span className={`rounded-full px-2 py-1 text-xs ring-1 ring-inset ${getPriorityColor(ticket.priority)}`}>
                         {ticket.priority}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {ticket.assignedTo ? (
                         <div className="flex items-center">
-                          <div className="w-6 h-6 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700 mr-2">
+                          <div className="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
                             {ticket.assignedTo.name.charAt(0).toUpperCase()}
                           </div>
                           <span className="text-sm text-gray-900">
@@ -448,12 +448,12 @@ const CreateTicketModal = ({ projects, onClose, onCreate }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-screen overflow-y-auto">
-        <h2 className="text-lg font-semibold mb-4">Create New Ticket</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-lg max-h-screen overflow-y-auto rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
+        <h2 className="mb-4 text-lg font-semibold">Create New Ticket</h2>
         
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+          <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3">
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}
@@ -463,7 +463,7 @@ const CreateTicketModal = ({ projects, onClose, onCreate }) => {
             <label className="block text-sm font-medium text-gray-700">Project *</label>
             <select
               required
-              className="form-select mt-1"
+              className="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               value={formData.project}
               onChange={(e) => setFormData({...formData, project: e.target.value, assignedTo: ''})}
             >
@@ -480,7 +480,7 @@ const CreateTicketModal = ({ projects, onClose, onCreate }) => {
             <div>
               <label className="block text-sm font-medium text-gray-700">Type</label>
               <select
-                className="form-select mt-1"
+                className="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 value={formData.type}
                 onChange={(e) => setFormData({...formData, type: e.target.value})}
               >
@@ -495,7 +495,7 @@ const CreateTicketModal = ({ projects, onClose, onCreate }) => {
             <div>
               <label className="block text-sm font-medium text-gray-700">Priority</label>
               <select
-                className="form-select mt-1"
+                className="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 value={formData.priority}
                 onChange={(e) => setFormData({...formData, priority: e.target.value})}
               >
@@ -513,7 +513,7 @@ const CreateTicketModal = ({ projects, onClose, onCreate }) => {
             <input
               type="text"
               required
-              className="form-input mt-1"
+              className="mt-1 w-full rounded-md border border-gray-300 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               value={formData.title}
               onChange={(e) => setFormData({...formData, title: e.target.value})}
               placeholder="Brief summary of the issue or request"
@@ -524,7 +524,7 @@ const CreateTicketModal = ({ projects, onClose, onCreate }) => {
             <label className="block text-sm font-medium text-gray-700">Description *</label>
             <textarea
               required
-              className="form-textarea mt-1"
+              className="mt-1 w-full rounded-md border border-gray-300 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               rows="4"
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
@@ -540,13 +540,13 @@ const CreateTicketModal = ({ projects, onClose, onCreate }) => {
               </label>
               
               {isLoadingMembers ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-600 mx-auto"></div>
+                <div className="py-4 text-center">
+                  <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-brand-500/30 border-t-transparent"></div>
                 </div>
               ) : (
                 <div className="space-y-3">
                   <select
-                    className="form-select"
+                    className="w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                     value={formData.assignedTo}
                     onChange={(e) => setFormData({...formData, assignedTo: e.target.value})}
                   >
@@ -566,17 +566,17 @@ const CreateTicketModal = ({ projects, onClose, onCreate }) => {
                   
                   {/* Show assignee info */}
                   {formData.assignedTo && (
-                    <div className="p-2 bg-blue-50 border border-blue-200 rounded-md">
+                    <div className="rounded-md border border-blue-200 bg-blue-50 p-2">
                       {projectMembers.find(m => m._id === formData.assignedTo) && (
                         <div className="flex items-center space-x-2">
-                          <div className="w-6 h-6 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
                             {projectMembers.find(m => m._id === formData.assignedTo).name.charAt(0).toUpperCase()}
                           </div>
                           <div>
                             <span className="text-sm font-medium">
                               {projectMembers.find(m => m._id === formData.assignedTo).name}
                             </span>
-                            <span className={`ml-2 px-1 py-0.5 text-xs rounded ${
+                            <span className={`ml-2 rounded px-1 py-0.5 text-xs ${
                               projectMembers.find(m => m._id === formData.assignedTo).role === ROLES.ADMIN ? 'bg-red-100 text-red-700' :
                               projectMembers.find(m => m._id === formData.assignedTo).role === ROLES.MANAGER ? 'bg-blue-100 text-blue-700' :
                               'bg-green-100 text-green-700'
@@ -597,14 +597,14 @@ const CreateTicketModal = ({ projects, onClose, onCreate }) => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="btn btn-primary flex-1"
+              className="flex-1 inline-flex items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
             >
               {isSubmitting ? 'Creating...' : 'Create Ticket'}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="btn btn-secondary flex-1"
+              className="flex-1 inline-flex items-center justify-center rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               Cancel
             </button>

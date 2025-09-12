@@ -207,18 +207,18 @@ const ProjectBoard = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-brand-500/30 border-t-transparent"></div>
       </div>
     );
   }
 
   if (error && !project) {
     return (
-      <div className="text-center py-12">
-        <div className="bg-red-50 border border-red-200 rounded-md p-4 max-w-md mx-auto">
-          <p className="text-red-700">{error}</p>
-          <Link to="/projects" className="btn btn-outline btn-sm mt-4">
+      <div className="py-12 text-center">
+        <div className="mx-auto max-w-md rounded-lg border border-red-200 bg-red-50 p-5">
+          <p className="text-sm font-medium text-red-700">{error}</p>
+          <Link to="/projects" className="mt-3 inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
             Back to Projects
           </Link>
         </div>
@@ -227,28 +227,28 @@ const ProjectBoard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Project header */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-brand-50 to-white border border-brand-100 shadow-sm p-6 sm:p-8">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-2">
+            <div className="mb-2 flex items-center space-x-3">
               <Link
                 to="/projects"
-                className="text-brand-600 hover:text-brand-700 text-sm font-medium"
+                className="text-sm font-medium text-brand-600 hover:text-brand-700"
               >
                 ← Projects
               </Link>
               <span className="text-gray-300">/</span>
-              <span className="px-2 py-1 bg-brand-100 text-brand-800 text-xs font-medium rounded-md">
+              <span className="rounded-md bg-brand-100 px-2 py-1 text-xs font-medium text-brand-800 ring-1 ring-brand-200">
                 {project?.key}
               </span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">{project?.name}</h1>
+            <h1 className="mb-2 text-2xl font-semibold tracking-tight text-gray-900">{project?.name}</h1>
             {project?.description && (
-              <p className="text-gray-600 mb-4">{project.description}</p>
+              <p className="mb-4 text-gray-600">{project.description}</p>
             )}
-            <div className="flex items-center space-x-6 text-sm text-gray-500">
+            <div className="flex items-center space-x-6 text-sm text-gray-600">
               <span>👤 Manager: {project?.manager?.name}</span>
               <span>👥 {project?.members?.length || 0} members</span>
               <span>📝 {tasks.length} tasks</span>
@@ -260,7 +260,7 @@ const ProjectBoard = () => {
               setShowCreateTask(true);
               fetchAvailableAssignees();
             }}
-            className="btn btn-primary"
+            className="inline-flex items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
           >
             <span className="mr-2">+</span>
             Add Task
@@ -269,20 +269,20 @@ const ProjectBoard = () => {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <p className="text-red-700">{error}</p>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-medium text-red-700">{error}</p>
         </div>
       )}
 
       <div className="flex space-x-6">
         {/* Kanban board */}
         <div className="flex-1">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
             {statusColumns.map((column) => (
-              <div key={column.key} className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-4">
+              <div key={column.key} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
                   <h3 className="font-semibold text-gray-900">{column.title}</h3>
-                  <span className={`px-2 py-1 text-xs rounded-full ${column.color}`}>
+                  <span className={`rounded-full px-2 py-1 text-xs ring-1 ring-inset ${column.color}`}>
                     {getTasksByStatus(column.key).length}
                   </span>
                 </div>
@@ -291,16 +291,16 @@ const ProjectBoard = () => {
                   {getTasksByStatus(column.key).map((task) => (
                     <div
                       key={task._id}
-                      className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+                      className="rounded-lg border border-gray-100 bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
                     >
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-medium text-gray-900 text-sm mb-1">
+                      <div className="mb-2 flex items-start justify-between">
+                        <h4 className="mb-1 text-sm font-medium text-gray-900">
                           {task.title}
                         </h4>
                         {canManageTasks && (
                           <button
                             onClick={() => setShowAssignModal(task._id)}
-                            className="text-xs text-gray-500 hover:text-brand-600 px-1 py-0.5 rounded hover:bg-gray-100"
+                            className="rounded px-1 py-0.5 text-xs text-gray-500 hover:bg-gray-100 hover:text-brand-600"
                             title="Assign task"
                           >
                             👤
@@ -309,23 +309,23 @@ const ProjectBoard = () => {
                       </div>
                       
                       {task.description && (
-                        <p className="text-gray-600 text-xs mb-3 line-clamp-2">
+                        <p className="mb-3 line-clamp-2 text-xs text-gray-600">
                           {task.description}
                         </p>
                       )}
                       
-                      <div className="flex items-center justify-between mb-3">
+                      <div className="mb-3 flex items-center justify-between">
                         {task.points > 0 && (
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                          <span className="rounded px-2 py-1 text-xs ring-1 ring-inset bg-blue-50 text-blue-800 ring-blue-200">
                             {task.points} pts
                           </span>
                         )}
                         
                         {task.dueDate && (
-                          <span className={`text-xs px-2 py-1 rounded ${
+                          <span className={`rounded px-2 py-1 text-xs ring-1 ring-inset ${
                             isOverdue(task.dueDate)
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-gray-100 text-gray-700'
+                              ? 'bg-red-50 text-red-800 ring-red-200'
+                              : 'bg-gray-50 text-gray-700 ring-gray-200'
                           }`}>
                             {formatDate(task.dueDate)}
                           </span>
@@ -334,18 +334,18 @@ const ProjectBoard = () => {
                       
                       {/* Task assignees */}
                       {task.assignees?.length > 0 && (
-                        <div className="flex items-center space-x-1 mb-3">
+                        <div className="mb-3 flex items-center space-x-1">
                           {task.assignees.slice(0, 3).map((assignee) => (
                             <div
                               key={assignee._id}
-                              className="w-6 h-6 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700"
+                              className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs font-medium text-brand-700 ring-1 ring-brand-200"
                               title={assignee.name}
                             >
                               {assignee.name.charAt(0).toUpperCase()}
                             </div>
                           ))}
                           {task.assignees.length > 3 && (
-                            <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-xs text-gray-500">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-xs text-gray-500 ring-1 ring-gray-200">
                               +{task.assignees.length - 3}
                             </div>
                           )}
@@ -359,9 +359,9 @@ const ProjectBoard = () => {
                             key={statusOption.key}
                             onClick={() => handleTaskStatusChange(task._id, statusOption.key)}
                             disabled={task.status === statusOption.key}
-                            className={`px-2 py-1 text-xs rounded transition-colors ${
+                            className={`rounded px-2 py-1 text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/40 ${
                               task.status === statusOption.key
-                                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                ? 'cursor-not-allowed bg-gray-200 text-gray-500'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                             title={`Move to ${statusOption.title}`}
@@ -374,8 +374,8 @@ const ProjectBoard = () => {
                   ))}
                   
                   {getTasksByStatus(column.key).length === 0 && (
-                    <div className="text-center py-8">
-                      <p className="text-gray-400 text-sm">No tasks</p>
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-gray-400">No tasks</p>
                     </div>
                   )}
                 </div>
@@ -386,7 +386,7 @@ const ProjectBoard = () => {
 
         {/* Chat panel */}
         <div className="w-80">
-          <div className="h-96">
+          <div className="h-96 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
             <ChatPanel projectId={projectId} />
           </div>
         </div>
@@ -468,18 +468,18 @@ const TaskAssignModal = ({ task, project, onClose, onAssign }) => {
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-md">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600 mx-auto"></div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-brand-500/30 border-t-transparent"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-96 overflow-y-auto">
-        <h3 className="text-lg font-semibold mb-4">Assign Task: {task?.title}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md max-h-96 overflow-y-auto rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
+        <h3 className="mb-4 text-lg font-semibold">Assign Task: {task?.title}</h3>
         
         <div className="space-y-4">
           {Object.entries(usersByRole).map(([role, users]) => (
@@ -488,7 +488,7 @@ const TaskAssignModal = ({ task, project, onClose, onAssign }) => {
                 <h4 className="text-sm font-medium text-gray-700 mb-2">
                   {role}s ({users.length})
                 </h4>
-                <div className="space-y-2 pl-4 border-l-2 border-gray-200">
+                <div className="space-y-2 border-l-2 border-gray-200 pl-4">
                   {users.map((member) => (
                     <label key={member.id} className="flex items-center space-x-2">
                       <input
@@ -501,10 +501,10 @@ const TaskAssignModal = ({ task, project, onClose, onAssign }) => {
                             setSelectedAssignees(prev => prev.filter(id => id !== member.id));
                           }
                         }}
-                        className="rounded border-gray-300"
+                        className="rounded border-gray-300 focus:ring-brand-500/40"
                       />
                       <div className="flex items-center space-x-2">
-                        <div className="w-6 h-6 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
                           {member.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
@@ -520,11 +520,11 @@ const TaskAssignModal = ({ task, project, onClose, onAssign }) => {
           ))}
         </div>
         
-        <div className="flex space-x-3 mt-6">
-          <button onClick={handleAssign} className="btn btn-primary flex-1">
+        <div className="mt-6 flex space-x-3">
+          <button onClick={handleAssign} className="flex-1 inline-flex items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700">
             Assign ({selectedAssignees.length})
           </button>
-          <button onClick={onClose} className="btn btn-secondary flex-1">
+          <button onClick={onClose} className="flex-1 inline-flex items-center justify-center rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
             Cancel
           </button>
         </div>
@@ -565,9 +565,9 @@ const CreateTaskModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-screen overflow-y-auto">
-        <h2 className="text-lg font-semibold mb-4">Create New Task</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-lg max-h-screen overflow-y-auto rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
+        <h2 className="mb-4 text-lg font-semibold">Create New Task</h2>
         
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
@@ -575,7 +575,7 @@ const CreateTaskModal = ({
             <input
               type="text"
               required
-              className="form-input mt-1"
+              className="mt-1 w-full rounded-md border border-gray-300 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               value={newTask.title}
               onChange={(e) => setNewTask({...newTask, title: e.target.value})}
               placeholder="Enter task title"
@@ -585,7 +585,7 @@ const CreateTaskModal = ({
           <div>
             <label className="block text-sm font-medium text-gray-700">Description</label>
             <textarea
-              className="form-textarea mt-1"
+              className="mt-1 w-full rounded-md border border-gray-300 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               rows="3"
               value={newTask.description}
               onChange={(e) => setNewTask({...newTask, description: e.target.value})}
@@ -598,7 +598,7 @@ const CreateTaskModal = ({
               <label className="block text-sm font-medium text-gray-700">Due Date</label>
               <input
                 type="date"
-                className="form-input mt-1"
+                className="mt-1 w-full rounded-md border border-gray-300 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 value={newTask.dueDate}
                 onChange={(e) => handleDateChange('dueDate', e.target.value)}
               />
@@ -610,7 +610,7 @@ const CreateTaskModal = ({
                 type="number"
                 min="0"
                 max="100"
-                className="form-input mt-1"
+                className="mt-1 w-full rounded-md border border-gray-300 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 value={newTask.points}
                 onChange={(e) => setNewTask({...newTask, points: e.target.value})}
                 placeholder="0"
@@ -622,7 +622,7 @@ const CreateTaskModal = ({
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium text-gray-700">Assignees</label>
               <select
-                className="form-select text-xs"
+                className="text-xs rounded-md border border-gray-300 px-2 py-1 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value)}
               >
@@ -633,9 +633,9 @@ const CreateTaskModal = ({
               </select>
             </div>
             
-            <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-200 rounded-md p-2">
+            <div className="max-h-32 space-y-2 overflow-y-auto rounded-md border border-gray-200 p-2">
               {getDisplayUsers().length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-2">
+                <p className="py-2 text-center text-sm text-gray-500">
                   No available assignees
                   {newTask.dueDate && " for selected date"}
                 </p>
@@ -659,15 +659,15 @@ const CreateTaskModal = ({
                           }));
                         }
                       }}
-                      className="rounded border-gray-300"
+                      className="rounded border-gray-300 focus:ring-brand-500/40"
                     />
-                    <div className="flex items-center space-x-2 flex-1">
-                      <div className="w-5 h-5 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
+                    <div className="flex flex-1 items-center space-x-2">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-100 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
                         {member.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1">
                         <span className="text-sm">{member.name}</span>
-                        <span className={`ml-2 px-1 py-0.5 text-xs rounded ${
+                        <span className={`ml-2 rounded px-1 py-0.5 text-xs ${
                           member.role === ROLES.ADMIN ? 'bg-red-100 text-red-700' :
                           member.role === ROLES.MANAGER ? 'bg-blue-100 text-blue-700' :
                           'bg-green-100 text-green-700'
@@ -687,7 +687,7 @@ const CreateTaskModal = ({
             </div>
             
             {newTask.dueDate && (
-              <p className="text-xs text-blue-600 mt-1">
+              <p className="mt-1 text-xs text-blue-600">
                 ℹ️ Showing users available on {new Date(newTask.dueDate).toLocaleDateString()}
               </p>
             )}
@@ -697,14 +697,14 @@ const CreateTaskModal = ({
             <button
               type="submit"
               disabled={isCreating}
-              className="btn btn-primary flex-1"
+              className="flex-1 inline-flex items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
             >
               {isCreating ? 'Creating...' : 'Create Task'}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="btn btn-secondary flex-1"
+              className="flex-1 inline-flex items-center justify-center rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               Cancel
             </button>

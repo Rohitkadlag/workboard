@@ -184,11 +184,16 @@ export const getUsersByRole = async (req, res) => {
 
 export const getAvailableAssignees = async (req, res) => {
   try {
-    const { project: projectId, startDate, endDate } = req.query;
+    // Fix: Get projectId from route params, not query params
+    const { id: projectId } = req.params;
+    const { startDate, endDate } = req.query;
 
     if (!projectId) {
       return res.status(400).json({ error: 'Project ID is required' });
     }
+
+    console.log('Getting assignees for project:', projectId);
+    console.log('Date range:', { startDate, endDate });
 
     const project = await Project.findById(projectId).populate('members', '-passwordHash -__v');
     if (!project) {
@@ -208,18 +213,23 @@ export const getAvailableAssignees = async (req, res) => {
 
     // If date range provided, filter out users on approved leave
     if (startDate && endDate) {
-      const LeaveRequest = (await import('../models/LeaveRequest.js')).default;
-      const { LEAVE_STATUS } = await import('@workboard/shared');
-      
-      const usersOnLeave = await LeaveRequest.find({
-        status: LEAVE_STATUS.APPROVED,
-        startDate: { $lte: new Date(endDate) },
-        endDate: { $gte: new Date(startDate) }
-      }).distinct('employee');
+      try {
+        const LeaveRequest = (await import('../models/LeaveRequest.js')).default;
+        const { LEAVE_STATUS } = await import('@workboard/shared');
+        
+        const usersOnLeave = await LeaveRequest.find({
+          status: LEAVE_STATUS.APPROVED,
+          startDate: { $lte: new Date(endDate) },
+          endDate: { $gte: new Date(startDate) }
+        }).distinct('employee');
 
-      availableMembers = project.members.filter(member => 
-        !usersOnLeave.some(onLeaveId => onLeaveId.toString() === member._id.toString())
-      );
+        availableMembers = project.members.filter(member => 
+          !usersOnLeave.some(onLeaveId => onLeaveId.toString() === member._id.toString())
+        );
+      } catch (leaveError) {
+        console.warn('Error filtering users on leave:', leaveError);
+        // Continue without leave filtering if there's an error
+      }
     }
 
     // Group by role
@@ -241,6 +251,8 @@ export const getAvailableAssignees = async (req, res) => {
       }
     });
 
+    console.log('Returning assignees:', availableMembers.length);
+
     res.json({
       project: {
         id: project._id,
@@ -260,7 +272,11 @@ export const getAvailableAssignees = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Get available assignees error:', error);
     logger.error('Get available assignees error:', error);
-    res.status(500).json({ error: 'Failed to fetch available assignees' });
+    res.status(500).json({ 
+      error: 'Failed to fetch available assignees',
+      details: error.message 
+    });
   }
 };

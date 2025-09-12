@@ -168,18 +168,18 @@ const TicketDetailPage = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-brand-500/30 border-t-transparent"></div>
       </div>
     );
   }
 
   if (error && !ticket) {
     return (
-      <div className="text-center py-12">
-        <div className="bg-red-50 border border-red-200 rounded-md p-4 max-w-md mx-auto">
-          <p className="text-red-700">{error}</p>
-          <Link to="/tickets" className="btn btn-outline btn-sm mt-4">
+      <div className="py-12 text-center">
+        <div className="mx-auto max-w-md rounded-lg border border-red-200 bg-red-50 p-5">
+          <p className="text-sm font-medium text-red-700">{error}</p>
+          <Link to="/tickets" className="mt-3 inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
             Back to Tickets
           </Link>
         </div>
@@ -188,32 +188,32 @@ const TicketDetailPage = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="mx-auto max-w-4xl space-y-8 px-4 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <div className="flex items-center space-x-3 mb-4">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-brand-50 to-white border border-brand-100 shadow-sm p-6 sm:p-8">
+        <div className="mb-4 flex items-center space-x-3">
           <Link
             to="/tickets"
-            className="text-brand-600 hover:text-brand-700 text-sm font-medium"
+            className="text-sm font-medium text-brand-600 hover:text-brand-700"
           >
             ← Tickets
           </Link>
           <span className="text-gray-300">/</span>
-          <span className="text-gray-600 text-sm">#{id.slice(-6)}</span>
+          <span className="text-sm text-gray-600">#{id.slice(-6)}</span>
         </div>
 
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-2">
+            <div className="mb-2 flex items-center space-x-3">
               <span className="text-2xl">{getTypeIcon(ticket?.type)}</span>
-              <h1 className="text-2xl font-bold text-gray-900">{ticket?.title}</h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{ticket?.title}</h1>
             </div>
 
-            <div className="flex items-center space-x-4 mb-4">
-              <span className={`px-3 py-1 text-sm rounded-full border ${getStatusColor(ticket?.status)}`}>
+            <div className="mb-4 flex items-center space-x-4">
+              <span className={`rounded-full border px-3 py-1 text-sm ${getStatusColor(ticket?.status)}`}>
                 {ticket?.status?.replace('_', ' ')}
               </span>
-              <span className={`px-3 py-1 text-sm rounded-full border ${getPriorityColor(ticket?.priority)}`}>
+              <span className={`rounded-full border px-3 py-1 text-sm ${getPriorityColor(ticket?.priority)}`}>
                 {ticket?.priority} Priority
               </span>
               <span className="text-sm text-gray-500">
@@ -221,7 +221,7 @@ const TicketDetailPage = () => {
               </span>
             </div>
 
-            <p className="text-gray-600 whitespace-pre-wrap">{ticket?.description}</p>
+            <p className="whitespace-pre-wrap text-gray-600">{ticket?.description}</p>
           </div>
 
           {canUpdateTicket() && (
@@ -236,7 +236,7 @@ const TicketDetailPage = () => {
                 });
                 setShowUpdateModal(true);
               }}
-              className="btn btn-outline btn-sm"
+              className="inline-flex items-center rounded-md border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               Edit
             </button>
@@ -245,37 +245,37 @@ const TicketDetailPage = () => {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <p className="text-red-700">{error}</p>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-medium text-red-700">{error}</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Main Content - Comments */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">
               Comments ({ticket?.comments?.length || 0})
             </h3>
 
             {/* Add Comment Form */}
             <form onSubmit={handleAddComment} className="mb-6">
               <textarea
-                className="form-textarea w-full"
+                className="w-full rounded-md border border-gray-300 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 rows="3"
                 placeholder="Add a comment..."
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 maxLength={1000}
               />
-              <div className="flex justify-between items-center mt-2">
+              <div className="mt-2 flex items-center justify-between">
                 <span className="text-xs text-gray-500">
                   {newComment.length}/1000 characters
                 </span>
                 <button
                   type="submit"
                   disabled={!newComment.trim() || isAddingComment}
-                  className="btn btn-primary btn-sm"
+                  className="inline-flex items-center rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
                 >
                   {isAddingComment ? 'Adding...' : 'Add Comment'}
                 </button>
@@ -285,27 +285,27 @@ const TicketDetailPage = () => {
             {/* Comments List */}
             <div className="space-y-4">
               {ticket?.comments?.length === 0 ? (
-                <div className="text-center py-8">
-                  <span className="text-4xl mb-4 block">💬</span>
+                <div className="py-8 text-center">
+                  <span className="mb-4 block text-4xl">💬</span>
                   <p className="text-gray-500">No comments yet</p>
                 </div>
               ) : (
                 ticket?.comments?.map((comment) => (
-                  <div key={comment._id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <div className="w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center text-sm font-medium text-brand-700">
+                  <div key={comment._id} className="rounded-lg border border-gray-100 p-4">
+                    <div className="mb-2 flex items-center space-x-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-sm font-medium text-brand-700 ring-1 ring-brand-200">
                         {comment.author?.name?.charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <span className="text-sm font-medium text-gray-900">
                           {comment.author?.name}
                         </span>
-                        <span className="text-xs text-gray-500 ml-2">
+                        <span className="ml-2 text-xs text-gray-500">
                           {new Date(comment.createdAt).toLocaleString()}
                         </span>
                       </div>
                     </div>
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap pl-10">
+                    <p className="whitespace-pre-wrap pl-10 text-sm text-gray-700">
                       {comment.body}
                     </p>
                   </div>
@@ -318,8 +318,8 @@ const TicketDetailPage = () => {
         {/* Sidebar - Ticket Info */}
         <div className="space-y-6">
           {/* Details */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Details</h3>
+          <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">Details</h3>
             
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
@@ -340,7 +340,7 @@ const TicketDetailPage = () => {
               <div className="flex justify-between">
                 <span className="text-gray-600">Raised by:</span>
                 <div className="flex items-center space-x-1">
-                  <div className="w-5 h-5 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-100 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
                     {ticket?.raisedBy?.name?.charAt(0).toUpperCase()}
                   </div>
                   <span>{ticket?.raisedBy?.name}</span>
@@ -351,7 +351,7 @@ const TicketDetailPage = () => {
                 <span className="text-gray-600">Assigned to:</span>
                 {ticket?.assignedTo ? (
                   <div className="flex items-center space-x-1">
-                    <div className="w-5 h-5 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-100 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
                       {ticket.assignedTo.name.charAt(0).toUpperCase()}
                     </div>
                     <span>{ticket.assignedTo.name}</span>
@@ -369,16 +369,16 @@ const TicketDetailPage = () => {
           </div>
 
           {/* Activity Timeline */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Activity</h3>
+          <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">Activity</h3>
             
             <div className="space-y-3">
               <div className="flex items-start space-x-2 text-sm">
-                <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
+                <div className="mt-2 h-2 w-2 rounded-full bg-blue-600"></div>
                 <div>
                   <span className="text-gray-900">Ticket created by</span>
-                  <span className="font-medium ml-1">{ticket?.raisedBy?.name}</span>
-                  <div className="text-gray-500 text-xs">
+                  <span className="ml-1 font-medium">{ticket?.raisedBy?.name}</span>
+                  <div className="text-xs text-gray-500">
                     {new Date(ticket?.createdAt).toLocaleString()}
                   </div>
                 </div>
@@ -386,11 +386,11 @@ const TicketDetailPage = () => {
               
               {ticket?.comments?.map((comment) => (
                 <div key={comment._id} className="flex items-start space-x-2 text-sm">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full mt-2"></div>
+                  <div className="mt-2 h-2 w-2 rounded-full bg-gray-400"></div>
                   <div>
                     <span className="text-gray-900">Comment by</span>
-                    <span className="font-medium ml-1">{comment.author?.name}</span>
-                    <div className="text-gray-500 text-xs">
+                    <span className="ml-1 font-medium">{comment.author?.name}</span>
+                    <div className="text-xs text-gray-500">
                       {new Date(comment.createdAt).toLocaleString()}
                     </div>
                   </div>
@@ -456,16 +456,16 @@ const TicketUpdateModal = ({ ticket, updateData, setUpdateData, onClose, onUpdat
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-screen overflow-y-auto">
-        <h2 className="text-lg font-semibold mb-4">Update Ticket</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-lg max-h-screen overflow-y-auto rounded-2xl border border-gray-100 bg-white p-6 shadow-lg">
+        <h2 className="mb-4 text-lg font-semibold">Update Ticket</h2>
         
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Title</label>
             <input
               type="text"
-              className="form-input mt-1"
+              className="mt-1 w-full rounded-md border border-gray-300 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               value={updateData.title || ''}
               onChange={(e) => setUpdateData({...updateData, title: e.target.value})}
             />
@@ -474,7 +474,7 @@ const TicketUpdateModal = ({ ticket, updateData, setUpdateData, onClose, onUpdat
           <div>
             <label className="block text-sm font-medium text-gray-700">Description</label>
             <textarea
-              className="form-textarea mt-1"
+              className="mt-1 w-full rounded-md border border-gray-300 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               rows="4"
               value={updateData.description || ''}
               onChange={(e) => setUpdateData({...updateData, description: e.target.value})}
@@ -485,7 +485,7 @@ const TicketUpdateModal = ({ ticket, updateData, setUpdateData, onClose, onUpdat
             <div>
               <label className="block text-sm font-medium text-gray-700">Status</label>
               <select
-                className="form-select mt-1"
+                className="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 value={updateData.status || ticket.status}
                 onChange={(e) => setUpdateData({...updateData, status: e.target.value})}
                 disabled={isRaiser && updateData.status !== TICKET_STATUS.CLOSED}
@@ -497,7 +497,7 @@ const TicketUpdateModal = ({ ticket, updateData, setUpdateData, onClose, onUpdat
                 ))}
               </select>
               {isRaiser && (
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="mt-1 text-xs text-gray-500">
                   You can only close your own tickets
                 </p>
               )}
@@ -506,7 +506,7 @@ const TicketUpdateModal = ({ ticket, updateData, setUpdateData, onClose, onUpdat
             <div>
               <label className="block text-sm font-medium text-gray-700">Priority</label>
               <select
-                className="form-select mt-1"
+                className="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 value={updateData.priority || ticket.priority}
                 onChange={(e) => setUpdateData({...updateData, priority: e.target.value})}
                 disabled={!canAssign}
@@ -518,7 +518,7 @@ const TicketUpdateModal = ({ ticket, updateData, setUpdateData, onClose, onUpdat
                 ))}
               </select>
               {!canAssign && (
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="mt-1 text-xs text-gray-500">
                   Only managers and admins can change priority
                 </p>
               )}
@@ -527,11 +527,11 @@ const TicketUpdateModal = ({ ticket, updateData, setUpdateData, onClose, onUpdat
 
           {canAssign && (
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="mb-2 flex items-center justify-between">
                 <label className="block text-sm font-medium text-gray-700">Assign to</label>
                 {!isLoadingMembers && (
                   <select
-                    className="form-select text-xs"
+                    className="text-xs rounded-md border border-gray-300 px-2 py-1 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                     value={selectedRole}
                     onChange={(e) => setSelectedRole(e.target.value)}
                   >
@@ -544,12 +544,12 @@ const TicketUpdateModal = ({ ticket, updateData, setUpdateData, onClose, onUpdat
               </div>
               
               {isLoadingMembers ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-600 mx-auto"></div>
+                <div className="py-4 text-center">
+                  <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-brand-500/30 border-t-transparent"></div>
                 </div>
               ) : (
                 <select
-                  className="form-select mt-1"
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                   value={updateData.assignedTo || ticket.assignedTo?._id || ''}
                   onChange={(e) => setUpdateData({...updateData, assignedTo: e.target.value || null})}
                 >
@@ -570,17 +570,17 @@ const TicketUpdateModal = ({ ticket, updateData, setUpdateData, onClose, onUpdat
               
               {/* Show current assignee info */}
               {updateData.assignedTo && (
-                <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 p-2">
                   {projectMembers.find(m => m._id === updateData.assignedTo) && (
                     <div className="flex items-center space-x-2">
-                      <div className="w-6 h-6 bg-brand-100 rounded-full flex items-center justify-center text-xs font-medium text-brand-700">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
                         {projectMembers.find(m => m._id === updateData.assignedTo).name.charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <span className="text-sm font-medium">
                           {projectMembers.find(m => m._id === updateData.assignedTo).name}
                         </span>
-                        <span className={`ml-2 px-1 py-0.5 text-xs rounded ${
+                        <span className={`ml-2 rounded px-1 py-0.5 text-xs ${
                           projectMembers.find(m => m._id === updateData.assignedTo).role === ROLES.ADMIN ? 'bg-red-100 text-red-700' :
                           projectMembers.find(m => m._id === updateData.assignedTo).role === ROLES.MANAGER ? 'bg-blue-100 text-blue-700' :
                           'bg-green-100 text-green-700'
@@ -601,17 +601,17 @@ const TicketUpdateModal = ({ ticket, updateData, setUpdateData, onClose, onUpdat
           )}
         </div>
         
-        <div className="flex space-x-3 mt-6">
+        <div className="mt-6 flex space-x-3">
           <button
             onClick={onUpdate}
             disabled={isUpdating}
-            className="btn btn-primary flex-1"
+            className="flex-1 inline-flex items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
           >
             {isUpdating ? 'Updating...' : 'Update Ticket'}
           </button>
           <button
             onClick={onClose}
-            className="btn btn-secondary flex-1"
+            className="flex-1 inline-flex items-center justify-center rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Cancel
           </button>
